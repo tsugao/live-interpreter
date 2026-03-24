@@ -298,11 +298,10 @@ var modalName     = '';
 var PAUSE_MS        = 2500;   // 無音停止までの時間（Web Speech APIモード）
 var CHUNK_MAX       = 10000;  // 強制リスタートまでの最大時間（Web Speech APIモード）
 // ── 翻訳タイミング ──────────────────────────────────────────────────
-// Groq高速化により翻訳トリガーが頻発しやすいため、間隔を広めに設定
-// 「意味のある文節単位で1回翻訳」を基本方針とする
-var MIN_WAIT_MS     = 5000;   // 翻訳間隔の最小値（5秒）
-var FORCE_MS        = 20000;  // 強制翻訳タイムアウト（20秒）
-var MIN_WORDS       = 20;     // 翻訳開始の最小新規語数
+// センテンス境界まで待ってから翻訳するため、語数・時間の閾値を低めに設定し遅延を5秒程度に抑える
+var MIN_WAIT_MS     = 2500;   // 翻訳間隔の最小値（2.5秒）
+var FORCE_MS        = 10000;  // 強制翻訳タイムアウト（10秒、センテンス境界がなくても翻訳）
+var MIN_WORDS       = 8;      // 翻訳開始の最小新規語数（センテンス境界待ちと組み合わせ）
 var CTX_WORDS       = 200;    // 翻訳プロンプトへ送る英語コンテキスト語数
 var GROQ_CHUNK_MS        = 7000;  // Groqモード: 1チャンクの録音時間(ms)
 var GROQ_FIRST_CHUNK_MS  = 3500;  // Groqモード: 初回チャンクは短くして最初の文字起こしを早める
@@ -428,9 +427,9 @@ function renderJapanese() { renderJpDisplay(stableJp,''); }
 // ─── タイプライター表示キュー（v2.15）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
-function enqueueTypewriter(text, enStart) {
+function enqueueTypewriter(text, enStart, revStart) {
   if(!text) return;
-  pendingJpQueue.push({text:text, enStart:enStart});
+  pendingJpQueue.push({text:text, enStart:enStart, revStart:revStart});
   if(!isTyping) startNextTypewriter();
 }
 function startNextTypewriter() {
@@ -442,15 +441,16 @@ function startNextTypewriter() {
   isTyping=true;
   var item=pendingJpQueue.shift();
   var text=item.text;
-  // タイプライター開始時: 直前の JP・英語ハイライトを同時にリセット（グレーへ）
-  latestJpStart=stableJp.length;   // 前バッチ JP → jp-stable（薄青）
-  latestEnStart=item.enStart;      // 前バッチ英語 → hl-committed（グレー）、今バッチ以降 → hl-active（紫）
-  renderTranscript('');            // 英語ハイライトを即時更新
+  // タイプライター開始時: stableJp の末尾1文を切り戻す（リビジョン対象をタイプライターで再表示）
+  if(item.revStart!==undefined && item.revStart<stableJp.length) {
+    stableJp=stableJp.slice(0, item.revStart);
+  }
+  latestJpStart=stableJp.length;   // 前バッチ JP（末尾1文切り戻し後）→ jp-stable（薄青）
+  latestEnStart=item.enStart;      // 今バッチ英語 → hl-active（紫）に同期
+  renderTranscript('');
   var i=0, buffer='';
   function tick() {
     if(i>=text.length) {
-      // タイプライター完了 → stableJp に確定追加。latestJpStart はここには触らない
-      // （完了時点で latestJpStart は既にこのバッチの先頭を指しており、紫ハイライトが維持される）
       stableJp+=text;
       recentJpCtx=stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
       setTimeout(function(){ startNextTypewriter(); },200);
@@ -755,6 +755,32 @@ function stopListening() {
 
 // ─── 翻訳タイミング判定 ──────────────────────
 function hasSentEnd(t) { return /[.!?](\s|$)/.test(t); }
+
+// 英語テキスト内の「最後のセンテンス末尾位置」を返す（. ! ? の直後の位置）
+// センテンス境界が見つからない場合は -1
+function findLastSentenceEnd(text) {
+  for(var i=text.length-1; i>=0; i--) {
+    if(/[.!?]/.test(text[i]) && (i===text.length-1 || /\s/.test(text[i+1]))) {
+      return i+1;
+    }
+  }
+  return -1;
+}
+
+// stableJp の末尾1文の「開始位置」を返す（タイプライター前に切り戻す分量）
+// 最後の。！？の1つ前の。！？を探し、その直後を返す
+function findRevisionStart(jp) {
+  if(!jp) return 0;
+  var count=0;
+  for(var i=jp.length-1; i>=0; i--) {
+    if(/[。！？]/.test(jp[i])) {
+      count++;
+      if(count===2) return i+1; // 末尾1文の先頭
+    }
+  }
+  return 0; // 1文以下なら全体を対象
+}
+
 function maybeTranslate(immediate) {
   if(translating) return;
   var newEn=fullText.slice(lastSnapPos).trim();
@@ -762,45 +788,68 @@ function maybeTranslate(immediate) {
   var words=newEn.split(/\s+/).filter(Boolean).length;
   var wait=Date.now()-lastTransAt;
   if(wait<MIN_WAIT_MS) return;
-  if(words<MIN_WORDS) { if(wait>=FORCE_MS) doTranslate(); return; }
-  if(hasSentEnd(newEn)||immediate||wait>=FORCE_MS) doTranslate();
+  // センテンス境界（. ! ?）で区切れるか確認
+  var hasSent=(findLastSentenceEnd(newEn)>0);
+  if(words<MIN_WORDS && !hasSent) { if(wait>=FORCE_MS) doTranslate(); return; }
+  // センテンス境界あり、または語数十分、または強制タイムアウト → 翻訳
+  if(hasSent||wait>=FORCE_MS) doTranslate();
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.15 確定訳不変・新規英語のみ翻訳）────────
-// lastSnapPos 以降の「まだ翻訳していない英語」だけをClaudeへ送る。
-// 翻訳済み部分（stableJp）は一切変更しない。結果はタイプライターで追記。
+// ─── 翻訳実行（v2.16 センテンス境界＋末尾リビジョン）────────
+// ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
+// ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
+// ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
 function doTranslate() {
   if(translating) return;
-  var newEn=fullText.slice(lastSnapPos).trim();
-  if(!newEn||newEn.split(/\s+/).filter(Boolean).length<1) return;
+  var pending=fullText.slice(lastSnapPos);
+  if(!pending.trim()) return;
   var key=getKey(); if(!key) return;
 
+  // センテンス境界を探す（. ! ? の直後）
+  var sentEnd=findLastSentenceEnd(pending);
+  var translateEn, snapshot;
+  if(sentEnd>0) {
+    translateEn=pending.slice(0,sentEnd).trim();
+    snapshot=lastSnapPos+sentEnd;
+  } else {
+    // 境界なし → FORCE_MSで強制翻訳（途中でも翻訳する）
+    translateEn=pending.trim();
+    snapshot=lastSnapPos+pending.length;
+  }
+  if(!translateEn||translateEn.split(/\s+/).filter(Boolean).length<1) return;
+
+  // stableJp の末尾1文をリビジョン対象として抽出
+  var revStart=findRevisionStart(stableJp);
+  var revisionTail=stableJp.slice(revStart);          // 末尾1文（Claudeが小修正可）
+  var olderJpRef=stableJp.slice(0,revStart);          // それ以前（変更禁止・文体参照）
+  if(olderJpRef.length>200) olderJpRef='…'+olderJpRef.slice(-200);
+
+  var contextEn=fullText.slice(0,lastSnapPos).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
+  var ctx=getCtx();
+
   translating=true;
-  var snapshot=fullText.length;
-  var batchEnStart=lastSnapPos;   // このバッチの英語開始位置（タイプライターに渡す）
+  var batchEnStart=lastSnapPos;
   var batchStart=speechStartAt>0?speechStartAt:Date.now();
   lastTransAt=Date.now();
   setBadge('b-ai','🤖 翻訳中…','bwait');
 
-  // lastSnapPos より前の英語はコンテキスト用（訳出禁止）
-  var contextEn=fullText.slice(0,lastSnapPos).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
-  var recentJpRef=stableJp.length>300?'…'+stableJp.slice(-300):stableJp;
-  var ctx=getCtx();
   var parts=[
-    '同時通訳。[新規翻訳対象]の英語のみを日本語に訳せ。'
-    +'[これまでの日本語訳]の文末から自然に続くよう訳すこと。'
-    +'[文脈英語]は理解のみ・訳出禁止。'
-    +'【厳守】日本語訳文のみ出力。英語・説明・前置き一切禁止。必ず句点（。）で終わること。'
+    '同時通訳。[新規翻訳対象]の英語を日本語に訳せ。',
+    '[直前の日本語訳末尾]の文末から自然に続くよう訳すこと。',
+    '[直前の日本語訳末尾]は最後の1文のみ自然なつながりのため小修正してよい（大幅変更・削除禁止）。',
+    '[文脈英語]は理解のみ・訳出禁止。',
+    '【厳守】[直前の日本語訳末尾]（修正ありなら修正版）＋新訳のみ出力。英語・説明・前置き一切禁止。必ず句点（。）で終わること。'
   ];
-  if(ctx)          parts.push('[背景] '+ctx);
-  if(recentJpRef)  parts.push('[これまでの日本語訳（文末から続けること）] '+recentJpRef);
-  if(contextEn)    parts.push('[文脈英語（訳出禁止・背景理解のみ）] '+contextEn);
-  parts.push('[新規翻訳対象] '+newEn);
+  if(ctx)           parts.push('[背景] '+ctx);
+  if(olderJpRef)    parts.push('[確定済み日本語訳（変更禁止・文体参照のみ）] '+olderJpRef);
+  if(revisionTail)  parts.push('[直前の日本語訳末尾（最後の1文のみ小修正可）] '+revisionTail);
+  if(contextEn)     parts.push('[文脈英語（訳出禁止）] '+contextEn);
+  parts.push('[新規翻訳対象] '+translateEn);
 
   claudeFetch({
     model:'claude-haiku-4-5-20251001',
-    max_tokens:600,
+    max_tokens:700,
     messages:[{role:'user',content:parts.join('\n')}]
   },18000)
   .then(function(data) {
@@ -809,14 +858,15 @@ function doTranslate() {
     var jp=ensureKuten(raw);
     var lagSec=((Date.now()-batchStart)/1000).toFixed(1);
     recordLag(parseFloat(lagSec));
-    lastSnapPos=snapshot;   // 翻訳済み位置を確定
+    lastSnapPos=snapshot;
     speechStartAt=0;
     transCount++;
     document.getElementById('s-trans').textContent=transCount;
     setBadge('b-ai','🤖 完了','bon');
     var lb=document.getElementById('jp-lag-badge');
     if(lb) lb.textContent='⏱ '+lagSec+'s';
-    enqueueTypewriter(jp, batchEnStart);  // 英語開始位置も渡してハイライトを同期
+    // revStart: タイプライター開始時に末尾1文を切り戻し、リビジョン込みで再タイプ
+    enqueueTypewriter(jp, batchEnStart, revStart);
     renderTranscript('');
   })
   .catch(function(e) {
