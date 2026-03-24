@@ -99,7 +99,6 @@
     .jp-card { background:var(--panel2); border:1px solid #4dabf722;
                border-radius:10px; padding:11px 13px; margin-bottom:9px;
                animation:fi .25s ease; }
-    .jp-card.latest { border-color:var(--purple); box-shadow:0 0 8px #cc5de822; }
     @keyframes fi { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
     .jp-meta { font-size:10px; color:var(--muted); margin-bottom:5px;
                display:flex; justify-content:space-between; align-items:center; gap:4px; }
@@ -239,7 +238,7 @@
     <div id="split-bottom">
       <div id="jp-ph">
         翻訳結果がここに表示されます<br>
-        <span style="font-size:10px;opacity:.5">録音開始後、数秒〜15秒で最初の翻訳が届きます</span>
+        <span style="font-size:10px;opacity:.5">録音開始後、数秒で最初の翻訳が届きます</span>
       </div>
     </div>
 
@@ -300,9 +299,28 @@ let readPos        = 0;       // 翻訳済み末尾位置
 let lastTranslated = 0;       // 最後に翻訳を開始した時刻
 let translating    = false;
 
-// タイムラグ計測
-let batchStartTime = 0;       // 現在の未翻訳バッチの最初のテキストが届いた時刻
-let lagHistory     = [];      // 直近のタイムラグ記録 (秒)
+// タイムラグ計測（正確な音声入力開始〜翻訳表示までの計測）
+let batchArrivalTime  = 0;    // 現在の未翻訳バッチの最初のfinalテキスト到着時刻
+let lastFinalArrival  = 0;    // 最後にfinalテキストが届いた時刻（次バッチ追跡用）
+let lagHistory        = [];   // 直近のタイムラグ記録 (秒)
+
+// 翻訳済みセグメント（英語ハイライト用）
+let translatedSegments = [];  // {start, end, ci} — ci = カラーインデックス
+let colorIdx           = 0;
+
+// セグメントカラーパレット（英語ハイライト背景 / カード枠色）
+const SEG_COLORS_BG     = [
+  'rgba(77,171,247,0.20)',   // 青
+  'rgba(204,93,232,0.20)',   // 紫
+  'rgba(32,201,151,0.20)',   // 緑
+  'rgba(253,126,20,0.20)',   // オレンジ
+  'rgba(247,131,172,0.20)',  // ピンク
+  'rgba(148,216,45,0.20)',   // ライム
+  'rgba(255,212,59,0.20)',   // 黄
+];
+const SEG_COLORS_BORDER = [
+  '#4dabf7','#cc5de8','#20c997','#fd7e14','#f783ac','#94d82d','#ffd43b',
+];
 
 // コンテキスト
 let recentJpTrans  = [];      // 直近の日本語訳（文脈用）
@@ -323,12 +341,12 @@ let meterAnim      = null;
 let modalContent   = '';
 let modalFilename  = '';
 
-// ── 定数（翻訳速度チューニング）──
-const MIN_WORDS           = 4;     // 翻訳開始語数（減らすほど速い）
-const MIN_WORDS_COLDSTART = 6;     // 初回翻訳語数
-const MIN_WAIT            = 400;   // 翻訳間の最短間隔 ms
-const FORCE_TRANSLATE_MS  = 3500;  // 語数未満でも強制翻訳する待機時間 ms
-const CONTEXT_WORDS       = 300;   // Claude に渡す英語コンテキスト語数
+// ── 定数（翻訳速度チューニング — 超高速設定）──
+const MIN_WORDS           = 3;     // 翻訳開始語数（3語で即開始）
+const MIN_WORDS_COLDSTART = 4;     // 初回翻訳語数
+const MIN_WAIT            = 200;   // 翻訳間の最短間隔 ms（極限まで短縮）
+const FORCE_TRANSLATE_MS  = 2000;  // 語数未満でも強制翻訳する待機時間 ms
+const CONTEXT_WORDS       = 150;   // Claude に渡す英語コンテキスト語数（文脈理解のため150語維持）
 const SUMMARY_INTERVAL    = 90000; // 要約間隔 ms
 const SUMMARY_MIN_WORDS   = 30;
 
@@ -407,9 +425,7 @@ function recordLag(sec) {
 // ============================================================
 // 録音ステータス（仕切り行に表示）
 // ============================================================
-let meterBars = [];
 function startMeter() {
-  meterBars = [1,2,3].map(i => document.getElementById('mb'+i));
   meterAnim = setInterval(() => {
     const inline = document.getElementById('rec-inline');
     if (!inline) return;
@@ -450,10 +466,19 @@ function startListening() {
     }
 
     if (final_.trim()) {
-      // バッチ開始時刻を記録（未翻訳テキストが空のタイミング）
-      if (!fullText.slice(readPos).trim()) {
-        batchStartTime = Date.now();
+      // 正確なバッチ開始時刻の追跡:
+      // ・未翻訳テキストがない（=新バッチ開始）→ 今この瞬間を記録
+      // ・翻訳中に届いた追加テキスト → batchArrivalTime は引き継ぐが
+      //   翻訳完了後にlastFinalArrivalで補正する
+      if (fullText.length === readPos) {
+        // 完全な新バッチ
+        batchArrivalTime = Date.now();
+      } else if (batchArrivalTime === 0) {
+        // 翻訳完了直後にすぐ届いたテキスト（前バッチ完了でリセット後）
+        batchArrivalTime = Date.now();
       }
+      lastFinalArrival = Date.now();
+
       fullText += final_.trim() + ' ';
       document.getElementById('s-words').textContent =
         fullText.trim().split(/\s+/).filter(Boolean).length;
@@ -480,7 +505,7 @@ function startListening() {
 
   isOn = true;
   lastTranslated = Date.now();
-  batchStartTime = Date.now();
+  batchArrivalTime = Date.now();
 
   try { recognition.start(); }
   catch(e) { isOn = false; showErr('⚠️ 音声認識開始失敗: ' + e.message); return; }
@@ -506,11 +531,39 @@ function stopListening() {
   stopSummaryTimer();
 }
 
-// 原文エリア更新（確定白 + 途中黄）
+// ── 英語ハイライト付き原文ビルド ──
+function buildHighlightedTranscript() {
+  if (!fullText) return '';
+  let html = '';
+  let pos = 0;
+
+  for (const seg of translatedSegments) {
+    // セグメント前の未翻訳テキスト（通常は空だが念のため）
+    if (pos < seg.start) {
+      html += esc(fullText.slice(pos, seg.start));
+    }
+    // 翻訳済みセグメントをカード色でハイライト
+    const bg  = SEG_COLORS_BG[seg.ci % SEG_COLORS_BG.length];
+    const bdr = SEG_COLORS_BORDER[seg.ci % SEG_COLORS_BORDER.length];
+    html += `<span style="background:${bg};border-radius:3px;padding:0 1px;outline:1px solid ${bdr}22">`
+          + esc(fullText.slice(seg.start, seg.end))
+          + `</span>`;
+    pos = seg.end;
+  }
+
+  // 未翻訳の残りテキスト（ハイライトなし・やや暗め）
+  if (pos < fullText.length) {
+    html += `<span style="color:#999">${esc(fullText.slice(pos))}</span>`;
+  }
+
+  return html;
+}
+
+// 原文エリア更新（ハイライト付き）
 function updateTranscriptView(interim) {
   const committed = document.getElementById('transcript-committed');
   if (fullText.trim()) {
-    committed.textContent = fullText;
+    committed.innerHTML = buildHighlightedTranscript();
     committed.style.color = '#bbb';
   }
   document.getElementById('transcript-interim').textContent = interim || '';
@@ -547,7 +600,7 @@ function maybeTranslate(immediate = false) {
   const threshold   = isColdStart ? MIN_WORDS_COLDSTART : MIN_WORDS;
 
   if (words < threshold) {
-    // 強制翻訳タイムアウト
+    // 強制翻訳タイムアウト（2秒待てば2語でも翻訳）
     if (words >= 2 && wait >= FORCE_TRANSLATE_MS) { doTranslate(); return; }
     return;
   }
@@ -558,8 +611,8 @@ function maybeTranslate(immediate = false) {
   }
 }
 
-// 定期チェック（0.8 秒間隔 — 速い）
-setInterval(() => { if (isOn && !translating) maybeTranslate(); }, 800);
+// 定期チェック（500ms間隔 — 超高速）
+setInterval(() => { if (isOn && !translating) maybeTranslate(); }, 500);
 
 // ============================================================
 // Claude API 翻訳（超短プロンプトで低遅延化）
@@ -573,30 +626,31 @@ async function doTranslate() {
   if (!key) return;
 
   translating = true;
-  const snapshot        = fullText.length;
-  const capturedBatchStart = batchStartTime || Date.now();
-  lastTranslated        = Date.now();
+  const prevReadPos         = readPos;              // ハイライト用に保存
+  const snapshot            = fullText.length;
+  const capturedBatchStart  = batchArrivalTime || Date.now();
+  lastTranslated            = Date.now();
   setBadge('b-ai', '🤖 翻訳中…', 'bwait');
 
   // ── コンテキスト構築（最小限に絞って低遅延化）──
-  const jpCtx  = recentJpTrans.slice(-4).join(' '); // 直近4件だけ
+  const jpCtx  = recentJpTrans.slice(-3).join(' ');  // 直近3件
   const prevEn = fullText.slice(0, readPos).trim()
                   .split(/\s+/).filter(Boolean).slice(-CONTEXT_WORDS).join(' ');
   const ctx    = getCtx();
 
   // ── 超短プロンプト（トークン削減 → 速度向上）──
   const prompt = [
-    '同時通訳: 英語スピーチを自然な日本語に意訳。訳文のみ・1〜3文・「。」で終わること。言い淀み省略可。',
+    '同時通訳: 英語を自然な日本語に意訳。訳文のみ・1〜3文・「。」で終わること。',
     ctx    ? `[背景] ${ctx}`           : '',
     jpCtx  ? `[直近訳] ${jpCtx}`      : '',
-    prevEn ? `[英語文脈] ${prevEn.slice(-200)}` : '',
+    prevEn ? `[直前文脈] ${prevEn}` : '',
     `[訳して] ${chunk}`,
   ].filter(Boolean).join('\n');
 
   try {
     const res = await claudeRequest({
       model:      'claude-haiku-4-5-20251001',
-      max_tokens: 512,     // 短く設定して応答を速く
+      max_tokens: 280,     // さらに削減して応答を速く
       messages:   [{ role:'user', content: prompt }],
     }, 18000);
 
@@ -604,22 +658,36 @@ async function doTranslate() {
     if (!rawJp) throw new Error('翻訳結果が空です');
 
     const jpText = ensureJpComplete(rawJp);
-    readPos = snapshot;
-    setBadge('b-ai', '🤖 完了', 'bon');
 
-    // タイムラグ計測
+    // ── タイムラグ計測（音声入力開始 → 翻訳表示）──
     const lagSec = ((Date.now() - capturedBatchStart) / 1000).toFixed(1);
     recordLag(parseFloat(lagSec));
 
-    // 次バッチ開始時刻をリセット（次の finalText で再設定される）
-    batchStartTime = 0;
+    // ── セグメント登録（英語ハイライト用）──
+    const ci = colorIdx % SEG_COLORS_BG.length;
+    colorIdx++;
+    translatedSegments.push({ start: prevReadPos, end: snapshot, ci });
 
+    readPos = snapshot;
+
+    // バッチ到着時刻リセット
+    // 翻訳中に新テキストが届いていた場合は lastFinalArrival を引き継ぐ
+    if (fullText.length > readPos) {
+      batchArrivalTime = lastFinalArrival || Date.now();
+    } else {
+      batchArrivalTime = 0;
+    }
+
+    setBadge('b-ai', '🤖 完了', 'bon');
     recentJpTrans.push(jpText);
     if (recentJpTrans.length > 8) recentJpTrans.shift();
 
     jpCount++;
     document.getElementById('s-trans').textContent = jpCount;
-    addJpCard(jpText, chunk, lagSec);
+    addJpCard(jpText, chunk, lagSec, ci);
+
+    // ハイライト更新
+    updateTranscriptView('');
 
   } catch(e) {
     if (e.name !== 'AbortError') {
@@ -629,24 +697,35 @@ async function doTranslate() {
   } finally {
     translating = false;
     // 翻訳完了直後に次のテキストをすぐチェック（パイプライン化）
-    setTimeout(() => maybeTranslate(false), 100);
+    setTimeout(() => maybeTranslate(false), 80);
   }
 }
 
-function addJpCard(jpText, srcText, lagSec) {
+// ── 翻訳カードを追加（カード色をセグメント色と同期）──
+function addJpCard(jpText, srcText, lagSec, ci) {
   const bottom = document.getElementById('split-bottom');
   const ph     = document.getElementById('jp-ph');
   if (ph) ph.remove();
 
-  document.querySelectorAll('.jp-card.latest').forEach(c => c.classList.remove('latest'));
+  // 前のカードから「latest」を外す
+  document.querySelectorAll('.jp-card').forEach(c => {
+    c.style.boxShadow = '';
+  });
+
+  const borderColor = SEG_COLORS_BORDER[ci % SEG_COLORS_BORDER.length];
+  const bgColor     = SEG_COLORS_BG[ci % SEG_COLORS_BG.length];
 
   const card = document.createElement('div');
-  card.className = 'jp-card latest';
+  card.className = 'jp-card';
+  card.style.borderColor = borderColor;
+  card.style.boxShadow   = `0 0 10px ${borderColor}55`;
+  card.style.background  = `linear-gradient(135deg, var(--panel2), ${bgColor.replace('0.20','0.07')})`;
+
   const t = new Date().toLocaleTimeString('ja-JP');
   card.innerHTML = `
     <div class="jp-meta">
-      <span>🕐 ${t} &nbsp;#${jpCount}</span>
-      <span class="jp-lag">⏱ ${lagSec}s</span>
+      <span style="color:${borderColor};opacity:.8">🕐 ${t} &nbsp;#${jpCount}</span>
+      <span class="jp-lag" style="border-color:${borderColor}44;color:${borderColor}">⏱ ${lagSec}s</span>
     </div>
     <div class="jp-text">${esc(jpText).replace(/\n/g,'<br>')}</div>
     ${srcText ? `<div class="jp-src">${esc(srcText.slice(0,110))}${srcText.length>110?'…':''}</div>` : ''}
@@ -892,7 +971,6 @@ async function saveSession() {
 
   } catch(e) {
     console.error('[save-report]', e);
-    // エラー時は内容をモーダルで表示してコピーできるようにする
     showErr('⚠️ レポート生成エラー: ' + e.message);
     showSaveModal('レポート生成に失敗しました。英文文字起こしはダウンロード済みです。\n\nエラー: ' + e.message,
                   `report_${stamp}.md`);
@@ -965,12 +1043,14 @@ async function shareModalContent() {
 function clearAll() {
   if (isOn) stopListening();
   fullText=''; readPos=0; jpCount=0; startTime=null; recentJpTrans=[];
-  batchStartTime=0; lagHistory=[];
+  batchArrivalTime=0; lastFinalArrival=0; lagHistory=[];
+  translatedSegments=[]; colorIdx=0;
   summaryPos=0; summaryCount=0; summaryBusy=false;
   clearInterval(elapsedLoop); stopSummaryTimer();
 
-  document.getElementById('transcript-committed').textContent = '（英語音声をここに表示）';
-  document.getElementById('transcript-committed').style.color = '#555';
+  const committed = document.getElementById('transcript-committed');
+  committed.textContent = '（英語音声をここに表示）';
+  committed.style.color = '#555';
   document.getElementById('transcript-interim').textContent   = '';
   document.getElementById('s-words').textContent = '0';
   document.getElementById('s-trans').textContent = '0';
@@ -980,7 +1060,7 @@ function clearAll() {
   document.getElementById('split-bottom').innerHTML =
     '<div id="jp-ph" style="color:var(--muted);font-size:12px;text-align:center;padding:32px 0;line-height:1.8">' +
     '翻訳結果がここに表示されます<br>' +
-    '<span style="font-size:10px;opacity:.5">録音開始後、数秒〜15秒で最初の翻訳が届きます</span></div>';
+    '<span style="font-size:10px;opacity:.5">録音開始後、数秒で最初の翻訳が届きます</span></div>';
 
   document.getElementById('tab-summary').innerHTML =
     '<div id="sum-hdr" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
