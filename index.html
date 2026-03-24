@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.11</title>
+  <title>🎙️ Live Interpreter v2.12</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.11 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.12 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -284,7 +284,8 @@ var MIN_WAIT_MS     = 800;
 var FORCE_MS        = 8000;
 var MIN_WORDS       = 10;
 var CTX_WORDS       = 150;
-var MAX_WINDOW_WORDS = 150;   // ウィンドウ最大語数（超えたら古い部分をstableへスライド）
+var MAX_WINDOW_WORDS  = 150;  // ウィンドウ最大語数（超えたら古い部分をstableへスライド）
+var ACTIVE_EN_WORDS   = 50;   // 表示上アンダーラインを付ける最大語数（最新N語分のJPのみ下線）
 var SUMMARY_MS  = 90000;
 var SUMMARY_MIN = 30;
 
@@ -388,18 +389,29 @@ function renderJapanese() {
   var html='';
   if(stableJp) html+='<span class="jp-stable">'+esc(stableJp).replace(/\n/g,'<br>')+'</span>';
   if(windowJp) {
-    if(!prevWindowJp) {
-      // 初回 or スライド後 → ウィンドウ全体を下線
-      html+='<span class="jp-updated">'+esc(windowJp).replace(/\n/g,'<br>')+'</span>';
-    } else {
-      // 前回ウィンドウ訳との共通プレフィックスは下線なし、変化部分だけ下線
-      var cp=commonPrefixLen(prevWindowJp, windowJp);
-      var same=windowJp.slice(0,cp);
-      var changed=windowJp.slice(cp);
-      if(same)    html+='<span class="jp-active-same">'+esc(same).replace(/\n/g,'<br>')+'</span>';
-      if(changed) html+='<span class="jp-updated">'+esc(changed).replace(/\n/g,'<br>')+'</span>';
-      if(!same&&!changed) html+='<span class="jp-updated">'+esc(windowJp).replace(/\n/g,'<br>')+'</span>';
+    // ── 表示フリーズ領域の計算 ─────────────────────────────────
+    // ① 語数ベース: ウィンドウ内で「最新ACTIVE_EN_WORDS語分のJP」だけを下線対象に
+    var windowEnWords = fullText.slice(windowStart).split(/\s+/).filter(Boolean).length;
+    var frozenEnWords = Math.max(0, windowEnWords - ACTIVE_EN_WORDS);
+    var wordFrozenLen = windowEnWords > 0
+      ? Math.floor(windowJp.length * frozenEnWords / windowEnWords)
+      : 0;
+    // 。境界に向けて後ろへ調整（最大40文字遡る）
+    var adjFrozenLen = wordFrozenLen;
+    for(var i=wordFrozenLen; i>=Math.max(0, wordFrozenLen-40); i--) {
+      if(/[。！？]/.test(windowJp[i])){ adjFrozenLen=i+1; break; }
     }
+    // ② diff共通プレフィックスベース: Claudeが保持した先頭部分
+    var diffFrozenLen = prevWindowJp ? commonPrefixLen(prevWindowJp, windowJp) : 0;
+    // 2つの大きい方を採用（= アンダーライン領域を最小化）
+    var frozenLen = Math.max(adjFrozenLen, diffFrozenLen);
+    // 最低10文字は常にアクティブ表示（全部フリーズにはしない）
+    frozenLen = Math.min(frozenLen, Math.max(0, windowJp.length - 10));
+    // ── 描画 ─────────────────────────────────────────────────
+    var frozenPart = windowJp.slice(0, frozenLen);
+    var activePart = windowJp.slice(frozenLen);
+    if(frozenPart) html+='<span class="jp-active-same">'+esc(frozenPart).replace(/\n/g,'<br>')+'</span>';
+    if(activePart) html+='<span class="jp-updated">'+esc(activePart).replace(/\n/g,'<br>')+'</span>';
   }
   el.innerHTML=html;
   var bottom=document.getElementById('split-bottom');
@@ -449,7 +461,9 @@ function slideWindowIfNeeded() {
   // stableJpへ昇格
   stableJp    += windowJp.slice(0, jpSplitPos);
   windowJp     = windowJp.slice(jpSplitPos);
-  prevWindowJp = ''; // スライド後は全体を新鮮に下線表示
+  // スライド後も prevWindowJp を保持する（空にすると次の翻訳で全文アンダーラインになるため）
+  // 新しい windowJp（残存部分）をそのまま prev として引き継ぎ、Claudeが保持できた分を差分判定
+  prevWindowJp = windowJp;
   windowStart  += enSlideChars;
   recentJpCtx  = stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
   renderJapanese();
