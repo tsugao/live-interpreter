@@ -305,22 +305,15 @@ let lastFinalArrival  = 0;    // 最後にfinalテキストが届いた時刻（
 let lagHistory        = [];   // 直近のタイムラグ記録 (秒)
 
 // 翻訳済みセグメント（英語ハイライト用）
-let translatedSegments = [];  // {start, end, ci} — ci = カラーインデックス
-let colorIdx           = 0;
+let translatedSegments = [];  // {start, end} — 文字位置
+// ハイライト色: 最新=紫、それ以外=薄青
+const HL_LATEST_BG     = 'rgba(204,93,232,0.45)';
+const HL_LATEST_BORDER = '#cc5de8';
+const HL_PREV_BG       = 'rgba(77,171,247,0.18)';
+const HL_PREV_BORDER   = '#4dabf755';
 
-// セグメントカラーパレット（英語ハイライト背景 / カード枠色）
-const SEG_COLORS_BG     = [
-  'rgba(77,171,247,0.20)',   // 青
-  'rgba(204,93,232,0.20)',   // 紫
-  'rgba(32,201,151,0.20)',   // 緑
-  'rgba(253,126,20,0.20)',   // オレンジ
-  'rgba(247,131,172,0.20)',  // ピンク
-  'rgba(148,216,45,0.20)',   // ライム
-  'rgba(255,212,59,0.20)',   // 黄
-];
-const SEG_COLORS_BORDER = [
-  '#4dabf7','#cc5de8','#20c997','#fd7e14','#f783ac','#94d82d','#ffd43b',
-];
+// interim テキスト保持（翻訳後に消えないよう）
+let currentInterim = '';
 
 // コンテキスト
 let recentJpTrans  = [];      // 直近の日本語訳（文脈用）
@@ -466,17 +459,8 @@ function startListening() {
     }
 
     if (final_.trim()) {
-      // 正確なバッチ開始時刻の追跡:
-      // ・未翻訳テキストがない（=新バッチ開始）→ 今この瞬間を記録
-      // ・翻訳中に届いた追加テキスト → batchArrivalTime は引き継ぐが
-      //   翻訳完了後にlastFinalArrivalで補正する
-      if (fullText.length === readPos) {
-        // 完全な新バッチ
-        batchArrivalTime = Date.now();
-      } else if (batchArrivalTime === 0) {
-        // 翻訳完了直後にすぐ届いたテキスト（前バッチ完了でリセット後）
-        batchArrivalTime = Date.now();
-      }
+      // バッチ開始時刻: 0のときだけ記録（=新バッチの最初の語が届いた瞬間）
+      if (batchArrivalTime === 0) batchArrivalTime = Date.now();
       lastFinalArrival = Date.now();
 
       fullText += final_.trim() + ' ';
@@ -486,7 +470,8 @@ function startListening() {
       maybeTranslate(true);
     }
 
-    // 原文エリアを更新
+    // interim を保持して原文エリアを更新
+    currentInterim = interim;
     updateTranscriptView(interim);
   };
 
@@ -505,7 +490,7 @@ function startListening() {
 
   isOn = true;
   lastTranslated = Date.now();
-  batchArrivalTime = Date.now();
+  batchArrivalTime = 0;  // 発話が来た瞬間にセットする（録音開始時刻は含めない）
 
   try { recognition.start(); }
   catch(e) { isOn = false; showErr('⚠️ 音声認識開始失敗: ' + e.message); return; }
@@ -526,34 +511,40 @@ function stopListening() {
   clearInterval(elapsedLoop);
   stopMeter();
   setBadge('b-mic', '⏹ 停止', 'boff');
+  currentInterim = '';
   document.getElementById('transcript-interim').textContent = '';
   _updateBtns(false);
   stopSummaryTimer();
 }
 
 // ── 英語ハイライト付き原文ビルド ──
+// 最新セグメント=紫、過去セグメント=薄青、未翻訳=通常色
 function buildHighlightedTranscript() {
   if (!fullText) return '';
   let html = '';
   let pos = 0;
+  const lastIdx = translatedSegments.length - 1;
 
-  for (const seg of translatedSegments) {
-    // セグメント前の未翻訳テキスト（通常は空だが念のため）
+  for (let i = 0; i < translatedSegments.length; i++) {
+    const seg = translatedSegments[i];
+    const isLatest = (i === lastIdx);
+    const bg  = isLatest ? HL_LATEST_BG     : HL_PREV_BG;
+    const bdr = isLatest ? HL_LATEST_BORDER  : HL_PREV_BORDER;
+
+    // セグメント前のギャップ
     if (pos < seg.start) {
       html += esc(fullText.slice(pos, seg.start));
     }
-    // 翻訳済みセグメントをカード色でハイライト
-    const bg  = SEG_COLORS_BG[seg.ci % SEG_COLORS_BG.length];
-    const bdr = SEG_COLORS_BORDER[seg.ci % SEG_COLORS_BORDER.length];
-    html += `<span style="background:${bg};border-radius:3px;padding:0 1px;outline:1px solid ${bdr}22">`
+    html += `<span style="background:${bg};border-radius:3px;padding:1px 2px;`
+          + `border-bottom:2px solid ${bdr}">`
           + esc(fullText.slice(seg.start, seg.end))
           + `</span>`;
     pos = seg.end;
   }
 
-  // 未翻訳の残りテキスト（ハイライトなし・やや暗め）
+  // 未翻訳テキスト
   if (pos < fullText.length) {
-    html += `<span style="color:#999">${esc(fullText.slice(pos))}</span>`;
+    html += esc(fullText.slice(pos));
   }
 
   return html;
@@ -628,12 +619,13 @@ async function doTranslate() {
   translating = true;
   const prevReadPos         = readPos;              // ハイライト用に保存
   const snapshot            = fullText.length;
-  const capturedBatchStart  = batchArrivalTime || Date.now();
+  const capturedBatchStart  = batchArrivalTime > 0 ? batchArrivalTime : Date.now();
   lastTranslated            = Date.now();
   setBadge('b-ai', '🤖 翻訳中…', 'bwait');
 
-  // ── コンテキスト構築（最小限に絞って低遅延化）──
-  const jpCtx  = recentJpTrans.slice(-3).join(' ');  // 直近3件
+  // ── コンテキスト構築 ──
+  // 日本語コンテキストは直近2件・各80字まで（速度優先）
+  const jpCtx  = recentJpTrans.slice(-2).map(t => t.slice(0,80)).join(' ');
   const prevEn = fullText.slice(0, readPos).trim()
                   .split(/\s+/).filter(Boolean).slice(-CONTEXT_WORDS).join(' ');
   const ctx    = getCtx();
@@ -664,19 +656,15 @@ async function doTranslate() {
     recordLag(parseFloat(lagSec));
 
     // ── セグメント登録（英語ハイライト用）──
-    const ci = colorIdx % SEG_COLORS_BG.length;
-    colorIdx++;
-    translatedSegments.push({ start: prevReadPos, end: snapshot, ci });
+    // 先頭の空白を除いた実際の開始位置を求める
+    const leadingSpaces = fullText.slice(prevReadPos).length
+                        - fullText.slice(prevReadPos).trimStart().length;
+    translatedSegments.push({ start: prevReadPos + leadingSpaces, end: snapshot });
 
     readPos = snapshot;
 
-    // バッチ到着時刻リセット
-    // 翻訳中に新テキストが届いていた場合は lastFinalArrival を引き継ぐ
-    if (fullText.length > readPos) {
-      batchArrivalTime = lastFinalArrival || Date.now();
-    } else {
-      batchArrivalTime = 0;
-    }
+    // バッチ到着時刻リセット（次の発話で 0 から再計測）
+    batchArrivalTime = 0;
 
     setBadge('b-ai', '🤖 完了', 'bon');
     recentJpTrans.push(jpText);
@@ -684,10 +672,10 @@ async function doTranslate() {
 
     jpCount++;
     document.getElementById('s-trans').textContent = jpCount;
-    addJpCard(jpText, chunk, lagSec, ci);
+    addJpCard(jpText, chunk, lagSec);
 
-    // ハイライト更新
-    updateTranscriptView('');
+    // ハイライト更新（currentInterim を保持して interim を消さない）
+    updateTranscriptView(currentInterim);
 
   } catch(e) {
     if (e.name !== 'AbortError') {
@@ -701,31 +689,28 @@ async function doTranslate() {
   }
 }
 
-// ── 翻訳カードを追加（カード色をセグメント色と同期）──
-function addJpCard(jpText, srcText, lagSec, ci) {
+// ── 翻訳カードを追加（最新=紫、過去=薄く）──
+function addJpCard(jpText, srcText, lagSec) {
   const bottom = document.getElementById('split-bottom');
   const ph     = document.getElementById('jp-ph');
   if (ph) ph.remove();
 
-  // 前のカードから「latest」を外す
+  // 過去カードを薄くする（最新でなくなった）
   document.querySelectorAll('.jp-card').forEach(c => {
-    c.style.boxShadow = '';
+    c.style.borderColor = '#4dabf733';
+    c.style.boxShadow   = 'none';
   });
-
-  const borderColor = SEG_COLORS_BORDER[ci % SEG_COLORS_BORDER.length];
-  const bgColor     = SEG_COLORS_BG[ci % SEG_COLORS_BG.length];
 
   const card = document.createElement('div');
   card.className = 'jp-card';
-  card.style.borderColor = borderColor;
-  card.style.boxShadow   = `0 0 10px ${borderColor}55`;
-  card.style.background  = `linear-gradient(135deg, var(--panel2), ${bgColor.replace('0.20','0.07')})`;
+  card.style.borderColor = HL_LATEST_BORDER;
+  card.style.boxShadow   = `0 0 10px ${HL_LATEST_BORDER}44`;
 
   const t = new Date().toLocaleTimeString('ja-JP');
   card.innerHTML = `
     <div class="jp-meta">
-      <span style="color:${borderColor};opacity:.8">🕐 ${t} &nbsp;#${jpCount}</span>
-      <span class="jp-lag" style="border-color:${borderColor}44;color:${borderColor}">⏱ ${lagSec}s</span>
+      <span style="color:${HL_LATEST_BORDER};opacity:.85">🕐 ${t} &nbsp;#${jpCount}</span>
+      <span class="jp-lag" style="border-color:${HL_LATEST_BORDER}66;color:${HL_LATEST_BORDER}">⏱ ${lagSec}s</span>
     </div>
     <div class="jp-text">${esc(jpText).replace(/\n/g,'<br>')}</div>
     ${srcText ? `<div class="jp-src">${esc(srcText.slice(0,110))}${srcText.length>110?'…':''}</div>` : ''}
@@ -1044,7 +1029,7 @@ function clearAll() {
   if (isOn) stopListening();
   fullText=''; readPos=0; jpCount=0; startTime=null; recentJpTrans=[];
   batchArrivalTime=0; lastFinalArrival=0; lagHistory=[];
-  translatedSegments=[]; colorIdx=0;
+  translatedSegments=[]; currentInterim='';
   summaryPos=0; summaryCount=0; summaryBusy=false;
   clearInterval(elapsedLoop); stopSummaryTimer();
 
