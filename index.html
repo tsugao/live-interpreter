@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.19</title>
+  <title>🎙️ Live Interpreter v2.20</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.19 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.20 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.19 「確定訳は不変」アーキテクチャ
+// v2.20 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -399,7 +399,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.19）────────
+// ─── 日本語テキストレンダリング（v2.20）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -424,13 +424,14 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.19）─────────────────────
+// ─── タイプライター表示キュー（v2.20）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
-function enqueueTypewriter(text, enStart, revTail) {
+function enqueueTypewriter(text, enStart, revTail, batchStart) {
   if(!text) return;
   // revTail: 切り戻すべき末尾文字列（位置ではなく内容で保持→タイムラグによるズレ防止）
-  pendingJpQueue.push({text:text, enStart:enStart, revTail:revTail||''});
+  // batchStart: 音声入力開始時刻（タイプライター表示開始までの遅延計測用）
+  pendingJpQueue.push({text:text, enStart:enStart, revTail:revTail||'', batchStart:batchStart||0});
   if(!isTyping) startNextTypewriter();
 }
 function startNextTypewriter() {
@@ -442,14 +443,33 @@ function startNextTypewriter() {
   isTyping=true;
   var item=pendingJpQueue.shift();
   var text=item.text;
-  // タイプライター開始時: stableJp の末尾が revTail と一致する場合のみ切り戻す
-  // （位置ではなく文字列で判定するため、他のタイプライター完了による stableJp の伸長に安全）
+
+  // ① revTail 切り戻し（内容一致の場合のみ）
   if(item.revTail && stableJp.endsWith(item.revTail)) {
     stableJp=stableJp.slice(0, stableJp.length-item.revTail.length);
   }
-  latestJpStart=stableJp.length;   // 切り戻し後の末尾 → jp-stable（薄青）
-  latestEnStart=item.enStart;      // 今バッチ英語 → hl-active（紫）に同期
+
+  // ② 旧ハイライトを先に消す（JP: 薄青へ、EN: 翻訳済み全体をグレーへ）
+  latestJpStart=stableJp.length;
+  latestEnStart=lastSnapPos;   // いったん「翻訳済み全体グレー」状態にする
+  renderJpDisplay(stableJp,'');
   renderTranscript('');
+
+  // ③ 遅延計測: 音声入力開始 → タイプライター表示開始
+  if(item.batchStart>0) {
+    var lagSec=((Date.now()-item.batchStart)/1000).toFixed(1);
+    recordLag(parseFloat(lagSec));
+    var lb=document.getElementById('jp-lag-badge');
+    if(lb) lb.textContent='⏱ '+lagSec+'s';
+    document.getElementById('s-lag').textContent=lagSec+'s';
+  }
+
+  // ④ 150ms後: 今バッチの英語を紫ハイライト（旧が消えてから新が現れる）
+  setTimeout(function() {
+    latestEnStart=item.enStart;
+    renderTranscript('');
+  }, 150);
+
   var i=0, buffer='';
   function tick() {
     if(i>=text.length) {
@@ -798,7 +818,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.19 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.20 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -879,16 +899,13 @@ function doTranslate() {
     // リビジョンケースでClaudeが[元の末尾文]+[修正版]+[新訳]を出力した場合の重複除去
     var deduped = revisionTail ? deduplicateRevision(raw, revisionTail) : raw;
     var jp=ensureKuten(sanitizeJp(deduped));
-    var lagSec=((Date.now()-batchStart)/1000).toFixed(1);
-    recordLag(parseFloat(lagSec));
     lastSnapPos=snapshot;
     speechStartAt=0;
     transCount++;
     document.getElementById('s-trans').textContent=transCount;
     setBadge('b-ai','🤖 完了','bon');
-    var lb=document.getElementById('jp-lag-badge');
-    if(lb) lb.textContent='⏱ '+lagSec+'s';
-    enqueueTypewriter(jp, batchEnStart, revTailForQueue);
+    // ラグ計測はタイプライター開始時（表示開始）に行うため batchStart を渡す
+    enqueueTypewriter(jp, batchEnStart, revTailForQueue, batchStart);
     renderTranscript('');
   })
   .catch(function(e) {
