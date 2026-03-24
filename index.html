@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.10</title>
+  <title>🎙️ Live Interpreter v2.11</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.10 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.11 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -242,13 +242,14 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.5 翻訳状態
-var activeStart   = 0;      // アクティブ翻訳ウィンドウの英語開始位置
+// v2.11 スライディングウィンドウ翻訳状態
+// ウィンドウ内の英語は毎回まとめて再翻訳され、精度が逐次向上する
+// ウィンドウがMAX_WINDOW_WORDSを超えると古い部分がstableへスライドアウト
+var windowStart   = 0;      // アクティブウィンドウの英語開始位置（fullText内）
 var lastSnapPos   = 0;      // 最後の翻訳時点での fullText 長
-var stableJp      = '';     // 完全確定済み日本語（下線なし）
-var activeJp      = '';     // 現在のアクティブ翻訳（差分のみ下線）
-var prevActiveJp  = '';     // 一つ前のアクティブ翻訳（差分計算用）
-var isCommitted   = false;  // コミット済みフラグ（次の翻訳が来るまで下線を保持）
+var stableJp      = '';     // 確定済み日本語（下線なし、変更不可）
+var windowJp      = '';     // 現在のウィンドウ翻訳（差分下線あり）
+var prevWindowJp  = '';     // 前回のウィンドウ翻訳（差分計算用）
 var recentJpCtx   = '';     // 翻訳文脈用の直近JP
 var isForcedStop  = false;  // CHUNK_MAX 強制停止フラグ
 var lastInterim   = '';     // 直前のinterimテキスト（セッション終了時にfinalが来なかった場合の救済用）
@@ -277,13 +278,13 @@ var modalContent  = '';
 var modalName     = '';
 
 // ─── 定数 ───────────────────────────────────
-var PAUSE_MS       = 2500;   // 無音停止までの時間（長めに取り自然な文単位にする）
-var CHUNK_MAX      = 10000;  // 強制リスタートまでの最大時間
-var MIN_WAIT_MS    = 800;
-var FORCE_MS       = 8000;
-var MIN_WORDS      = 15;
-var CTX_WORDS      = 150;
-var RETRO_EN_CHARS = 150;    // コミット後に英語を引き戻す文字数（過去の訳の自然な改訂に使用）
+var PAUSE_MS        = 2500;   // 無音停止までの時間
+var CHUNK_MAX       = 10000;  // 強制リスタートまでの最大時間
+var MIN_WAIT_MS     = 800;
+var FORCE_MS        = 8000;
+var MIN_WORDS       = 10;
+var CTX_WORDS       = 150;
+var MAX_WINDOW_WORDS = 150;   // ウィンドウ最大語数（超えたら古い部分をstableへスライド）
 var SUMMARY_MS  = 90000;
 var SUMMARY_MIN = 30;
 
@@ -357,8 +358,8 @@ function renderTranscript(interim) {
     el.textContent='（英語音声をここに表示）'; el.style.color='#555';
   } else {
     var html='';
-    if(activeStart>0) html+='<span class="hl-committed">'+esc(fullText.slice(0,activeStart))+'</span>';
-    if(activeStart<fullText.length) html+='<span class="hl-active">'+esc(fullText.slice(activeStart))+'</span>';
+    if(windowStart>0) html+='<span class="hl-committed">'+esc(fullText.slice(0,windowStart))+'</span>';
+    if(windowStart<fullText.length) html+='<span class="hl-active">'+esc(fullText.slice(windowStart))+'</span>';
     el.innerHTML=html; el.style.color='';
   }
   document.getElementById('transcript-interim').textContent=interim||'';
@@ -366,12 +367,12 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.4）────────
-// stableJp  : 確定済み（下線なし・薄青）
-// activeJp  : 更新中（prevActiveJp との差分のみ下線）
+// ─── 日本語テキストレンダリング（v2.11）────────
+// stableJp  : 確定済み（下線なし・薄青）ウィンドウからスライドアウトした部分
+// windowJp  : 現在ウィンドウの翻訳（prevWindowJp との差分のみ下線）
 //   - 共通プレフィックス部分 → jp-active-same（下線なし）
 //   - 変化・追加部分        → jp-updated（下線あり）
-//   - prevActiveJp が空なら全体を jp-updated
+//   - prevWindowJp が空なら全体を jp-updated（初回 or スライド後）
 function commonPrefixLen(a, b) {
   var i=0, len=Math.min(a.length, b.length);
   while(i<len && a[i]===b[i]) i++;
@@ -379,25 +380,25 @@ function commonPrefixLen(a, b) {
 }
 function renderJapanese() {
   var el=document.getElementById('jp-display');
-  if(!stableJp && !activeJp) {
+  if(!stableJp && !windowJp) {
     el.innerHTML='<span id="jp-ph">翻訳結果がここに表示されます<br>'
-      +'<span style="font-size:10px;opacity:.5">続く音声で随時更新・下線部が変更箇所です</span></span>';
+      +'<span style="font-size:10px;opacity:.5">続く音声で随時更新・下線部が最新更新箇所です</span></span>';
     return;
   }
   var html='';
   if(stableJp) html+='<span class="jp-stable">'+esc(stableJp).replace(/\n/g,'<br>')+'</span>';
-  if(activeJp) {
-    if(!prevActiveJp) {
-      // このブロック初回翻訳 → 全体を下線
-      html+='<span class="jp-updated">'+esc(activeJp).replace(/\n/g,'<br>')+'</span>';
+  if(windowJp) {
+    if(!prevWindowJp) {
+      // 初回 or スライド後 → ウィンドウ全体を下線
+      html+='<span class="jp-updated">'+esc(windowJp).replace(/\n/g,'<br>')+'</span>';
     } else {
-      // 前回訳との共通プレフィックスは下線なし、変化部分だけ下線
-      var cp=commonPrefixLen(prevActiveJp, activeJp);
-      var same=activeJp.slice(0,cp);
-      var changed=activeJp.slice(cp);
+      // 前回ウィンドウ訳との共通プレフィックスは下線なし、変化部分だけ下線
+      var cp=commonPrefixLen(prevWindowJp, windowJp);
+      var same=windowJp.slice(0,cp);
+      var changed=windowJp.slice(cp);
       if(same)    html+='<span class="jp-active-same">'+esc(same).replace(/\n/g,'<br>')+'</span>';
       if(changed) html+='<span class="jp-updated">'+esc(changed).replace(/\n/g,'<br>')+'</span>';
-      if(!same&&!changed) html+='<span class="jp-updated">'+esc(activeJp).replace(/\n/g,'<br>')+'</span>';
+      if(!same&&!changed) html+='<span class="jp-updated">'+esc(windowJp).replace(/\n/g,'<br>')+'</span>';
     }
   }
   el.innerHTML=html;
@@ -405,31 +406,53 @@ function renderJapanese() {
   requestAnimationFrame(function(){ bottom.scrollTop=bottom.scrollHeight; });
 }
 
-// ─── コミット：activeJp を「コミット済み」に昇格 ────
-// activeJp は消さずに残す（下線を保持）→ 次の翻訳が来たときに stableJp へ移動
-// isCommitted フラグで「次の翻訳時にstableへ移す」ことを伝える
-// prevActiveJp = '' にすることで次の翻訳は新ブロック扱い（全体下線）
-function commitActiveTranslation() {
-  if(!activeJp) return;
-  // stableJp には移動せず、activeJp はそのまま（下線表示を維持）
-  recentJpCtx  = (stableJp+activeJp).split(/[。！？]/).filter(Boolean).slice(-6).join('。');
-  isCommitted  = true;   // 次の翻訳到着時に stableJp へ移動
-  prevActiveJp = '';     // 次は新ブロック → 全体下線
-  activeStart  = lastSnapPos;
+// ─── スライディングウィンドウ：古い部分をstableへ移動 ─────
+// ウィンドウ内英語が MAX_WINDOW_WORDS を超えたとき、先頭部分（約35%）を stableJp へ昇格
+// 日本語は英語の文字数比に基づいて比例的に分割（日本語文末で補正）
+function slideWindowIfNeeded() {
+  var windowEn = fullText.slice(windowStart);
+  var wordCount = windowEn.split(/\s+/).filter(Boolean).length;
+  if (wordCount <= MAX_WINDOW_WORDS) return;
 
-  renderJapanese();
-  var lb=document.getElementById('jp-lag-badge');
-  if(lb) lb.textContent='';
-}
-// 翻訳中ならば完了を待ってからコミット（最大5秒）
-function commitWhenReady() {
-  var tries=0;
-  function attempt() {
-    if(!translating) { commitActiveTranslation(); return; }
-    if(tries++<33) setTimeout(attempt,150);
-    else commitActiveTranslation();
+  // スライドする分量：ウィンドウの約35%分の単語
+  var slideWords = Math.floor(wordCount * 0.35);
+  var words = windowEn.split(/\s+/).filter(Boolean);
+  var slideTarget = words.slice(0, slideWords).join(' ').length;
+
+  // 英語の文末（. ! ?）を探してスライド位置を決定（自然な文境界で区切る）
+  var searchArea = windowEn.slice(0, slideTarget + 80);
+  var sentenceEndPos = -1;
+  // 文末記号の位置を後ろから探す
+  for (var i = Math.min(slideTarget + 60, searchArea.length - 1); i >= slideTarget * 0.5; i--) {
+    if (/[.!?]/.test(searchArea[i]) && (i + 1 >= searchArea.length || /\s/.test(searchArea[i + 1]))) {
+      sentenceEndPos = i + 1; break;
+    }
   }
-  attempt();
+  var enSlideChars = sentenceEndPos > 0 ? sentenceEndPos : slideTarget;
+
+  // 日本語を比例分割（英語の文字数比率で分割位置を推定）
+  if (!windowJp) { windowStart += enSlideChars; return; }
+  var enRatio = enSlideChars / windowEn.length;
+  var jpSplitTarget = Math.floor(windowJp.length * enRatio);
+  // 日本語文末（。！？）を探して自然な位置で区切る（±30文字の範囲で探索）
+  var jpSplitPos = jpSplitTarget;
+  var found = false;
+  for (var k = jpSplitTarget; k >= Math.max(0, jpSplitTarget - 30); k--) {
+    if (/[。！？]/.test(windowJp[k])) { jpSplitPos = k + 1; found = true; break; }
+  }
+  if (!found) {
+    for (var m = jpSplitTarget + 1; m < Math.min(windowJp.length, jpSplitTarget + 30); m++) {
+      if (/[。！？]/.test(windowJp[m])) { jpSplitPos = m + 1; break; }
+    }
+  }
+
+  // stableJpへ昇格
+  stableJp    += windowJp.slice(0, jpSplitPos);
+  windowJp     = windowJp.slice(jpSplitPos);
+  prevWindowJp = ''; // スライド後は全体を新鮮に下線表示
+  windowStart  += enSlideChars;
+  recentJpCtx  = stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
+  renderJapanese();
 }
 
 // ─── 音声認識 ────────────────────────────────
@@ -471,10 +494,9 @@ function buildRecognition() {
         fullText+=lastInterim+' ';
         lastInterim='';
         document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
-        maybeTranslate(true);
       }
-      // 無音による自然停止 → 翻訳完了待ちでコミット
-      if(!wasForced) commitWhenReady();
+      // 無音による自然停止 → 翻訳トリガー（コミットは不要、ウィンドウは語数で自動スライド）
+      if(!wasForced) maybeTranslate(true);
       setTimeout(function(){
         if(!isOn) return;
         try {
@@ -578,35 +600,33 @@ function stopListening() {
 function hasSentEnd(t) { return /[.!?](\s|$)/.test(t); }
 function maybeTranslate(immediate) {
   if(translating) return;
-  var activeEn=fullText.slice(activeStart).trim();
-  if(!activeEn) return;
-  var words=activeEn.split(/\s+/).filter(Boolean).length;
+  var windowEn=fullText.slice(windowStart).trim();
+  if(!windowEn) return;
+  var words=windowEn.split(/\s+/).filter(Boolean).length;
   var wait=Date.now()-lastTransAt;
   if(wait<MIN_WAIT_MS) return;
   if(words<MIN_WORDS) { if(wait>=FORCE_MS) doTranslate(); return; }
-  if(hasSentEnd(activeEn)||immediate||wait>=FORCE_MS) doTranslate();
+  if(hasSentEnd(windowEn)||immediate||wait>=FORCE_MS) doTranslate();
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.2 コア） ───────────────────
-// activeStart 以降の英語全体を毎回再翻訳し activeJp を上書き更新
-// activeStart はコミット後に引き戻されるため、直前の確定訳も自然に改訂される
+// ─── 翻訳実行（v2.11 スライディングウィンドウ） ─────────
+// windowStart 以降の英語全体を毎回再翻訳し windowJp を上書き更新
+// ウィンドウが MAX_WINDOW_WORDS を超えると slideWindowIfNeeded() が古い部分をstableへ昇格
 function doTranslate() {
   if(translating) return;
-  var activeEn=fullText.slice(activeStart).trim();
-  if(!activeEn||activeEn.split(/\s+/).filter(Boolean).length<1) return;
+  var windowEn=fullText.slice(windowStart).trim();
+  if(!windowEn||windowEn.split(/\s+/).filter(Boolean).length<1) return;
   var key=getKey(); if(!key) return;
 
   translating=true;
   var snapshot=fullText.length;
-  // 翻訳開始時点のコミット状態を保存（翻訳中に変化する場合があるため）
-  var committedAtStart=isCommitted;
   var batchStart=speechStartAt>0?speechStartAt:Date.now();
   lastTransAt=Date.now();
   setBadge('b-ai','🤖 翻訳中…','bwait');
 
-  // activeStart より前の英語はコンテキスト用（訳出しない）
-  var contextEn=fullText.slice(0,activeStart).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
+  // windowStart より前の英語はコンテキスト用（訳出しない）
+  var contextEn=fullText.slice(0,windowStart).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
   var ctx=getCtx();
   var parts=[
     '同時通訳。[翻訳対象]の英語を自然で流暢な日本語に訳せ。'
@@ -616,22 +636,22 @@ function doTranslate() {
   ];
   if(ctx)         parts.push('[背景] '+ctx);
   if(recentJpCtx) parts.push('[直近確定訳（文体・トーンを引き継ぐこと）] '+recentJpCtx.slice(-200));
-  // [前回訳]は同一ブロック内の再翻訳のみ送る
-  // 新ブロック（committedAtStart=true）に送ると stableJp と activeJp が重複する原因になる
-  if(activeJp && !committedAtStart) {
+  // [前回訳]が存在する場合は「文頭を保持して末尾だけ延長」するよう指示
+  // → 差分下線を最小化し、翻訳の一貫性を保つ
+  if(prevWindowJp) {
     parts.push(
-      '[前回訳] '+activeJp+'\n'
+      '[前回訳] '+prevWindowJp+'\n'
       +'※[前回訳]がある場合：文頭から最大限同じ表現を保て。'
       +'英語が増えた分だけ末尾を延長または最小限修正すること。'
       +'[前回訳]の前半を書き換えると差分が大きくなるため厳禁。'
     );
   }
   if(contextEn)   parts.push('[文脈] '+contextEn);
-  parts.push('[翻訳対象] '+activeEn);
+  parts.push('[翻訳対象] '+windowEn);
 
   claudeFetch({
     model:'claude-haiku-4-5-20251001',
-    max_tokens:700,
+    max_tokens:800,
     messages:[{role:'user',content:parts.join('\n')}]
   },18000)
   .then(function(data) {
@@ -641,22 +661,11 @@ function doTranslate() {
     var lagSec=((Date.now()-batchStart)/1000).toFixed(1);
     recordLag(parseFloat(lagSec));
     lastSnapPos=snapshot;
-    if(committedAtStart) {
-      // 翻訳開始時点で新ブロック → 旧activeJpをstableへ移動、jpは新内容の新鮮な訳
-      stableJp+=activeJp;
-      isCommitted=false;
-      prevActiveJp=''; // 新ブロック初回 → 全体下線
-    } else if(isCommitted) {
-      // 翻訳中にコミットが発生したケース
-      // jpは旧activeEnを翻訳したもの（stableJpと内容が重なる可能性）
-      // → stableへは移動しない。次の翻訳でcommittedAtStart=trueになってから移動する
-      if(jp!==activeJp) prevActiveJp=activeJp;
-      // isCommitted=true のまま維持（次回のdoTranslateでcommittedAtStart=trueになる）
-    } else {
-      // 同一ブロック内の更新：内容が変化した場合のみ prevActiveJp を更新
-      if(jp!==activeJp) prevActiveJp=activeJp;
-    }
-    activeJp=jp;
+
+    // 差分計算用に前回ウィンドウ訳を保存
+    if(jp!==windowJp) prevWindowJp=windowJp;
+    windowJp=jp;
+
     speechStartAt=0;
     transCount++;
     document.getElementById('s-trans').textContent=transCount;
@@ -665,6 +674,9 @@ function doTranslate() {
     if(lb) lb.textContent='⏱ '+lagSec+'s';
     renderJapanese();
     renderTranscript('');
+
+    // ウィンドウが大きくなりすぎたら古い部分をstableへスライド
+    slideWindowIfNeeded();
   })
   .catch(function(e) {
     if(e&&e.name!=='AbortError') { showErr('⚠️ 翻訳エラー: '+e.message); setBadge('b-ai','⚠️ エラー','boff'); }
@@ -786,7 +798,7 @@ function flushTrans() {
   function next() {
     if(tries++>=8) return Promise.resolve();
     if(translating) return new Promise(function(r){ setTimeout(function(){next().then(r);},300); });
-    var rem=fullText.slice(activeStart).trim();
+    var rem=fullText.slice(windowStart).trim();
     if(rem.split(/\s+/).filter(Boolean).length<1) return Promise.resolve();
     lastTransAt=0; doTranslate();
     return new Promise(function(r){ setTimeout(function(){next().then(r);},2500); });
@@ -861,8 +873,8 @@ function copyModal(){
 // ─── クリア ──────────────────────────────────
 function clearAll() {
   if(isOn) stopListening();
-  fullText=''; activeStart=0; lastSnapPos=0;
-  stableJp=''; activeJp=''; prevActiveJp=''; isCommitted=false; recentJpCtx='';
+  fullText=''; windowStart=0; lastSnapPos=0;
+  stableJp=''; windowJp=''; prevWindowJp=''; recentJpCtx='';
   translating=false; lastTransAt=0; speechStartAt=0; lastSpeechAt=0;
   lagHistory=[]; transCount=0; startTime=null; isForcedStop=false;
   summaryPos=0; summaryCount=0; summaryBusy=false;
