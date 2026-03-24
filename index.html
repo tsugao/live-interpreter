@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter</title>
+  <title>🎙️ Live Interpreter v1.2</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -157,7 +157,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v1.2 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -262,7 +262,8 @@ var segments      = [];      // [{start, end}]
 // 認識
 var recognition   = null;
 var meterAnim     = null;
-var chunkTimer    = null;    // 強制リスタートタイマー
+var chunkTimer    = null;    // 無音検知リスタートタイマー
+var lastSpeechAt  = 0;       // 最後にinterim/finalが届いた時刻
 
 // コンテキスト
 var recentJp      = [];      // 直近の日本語訳
@@ -286,10 +287,11 @@ var modalName    = '';
 // ─────────────────────────────────────────────
 // 定数
 // ─────────────────────────────────────────────
-var CHUNK_MS    = 6000;   // iOSで短く切るための強制リスタート間隔(ms)
-var MIN_WAIT_MS = 150;    // 翻訳間の最短間隔
-var FORCE_MS    = 1500;   // 語数未満でも強制翻訳するタイムアウト
-var MIN_WORDS   = 3;      // 翻訳開始語数
+var PAUSE_MS    = 2000;   // この時間無音が続いたらリスタート（文途中では切らない）
+var CHUNK_MAX   = 25000;  // 最大待機 ms（無音なくても強制リスタート）
+var MIN_WAIT_MS = 200;    // 翻訳間の最短間隔
+var FORCE_MS    = 4000;   // 語数未満でも強制翻訳するタイムアウト
+var MIN_WORDS   = 8;      // 翻訳開始語数（意味のある単位）
 var CTX_WORDS   = 150;    // コンテキスト語数（文意把握用・訳出しない）
 var SUMMARY_MS  = 90000;
 var SUMMARY_MIN = 30;
@@ -433,10 +435,15 @@ function buildRecognition() {
       else interim += t;
     }
 
-    // ── ラグ計測: interimが来た瞬間が「発話開始」 ──
-    // （isFinalを待たず、声が聞こえた時点からカウント）
+    // ── 発話検知 ──
+    // interimが来た瞬間を発話開始として記録（ラグ計測の起点）
     if ((interim.trim() || finals.trim()) && speechStartAt === 0) {
       speechStartAt = Date.now();
+    }
+    // 最後に声が届いた時刻を更新（無音検知リスタートに使用）
+    if (interim.trim() || finals.trim()) {
+      lastSpeechAt = Date.now();
+      resetChunkTimer(); // 音声が続く限りリスタートを延期
     }
 
     if (finals.trim()) {
@@ -452,8 +459,8 @@ function buildRecognition() {
 
   r.onend = function() {
     clearTimeout(chunkTimer);
+    clearTimeout(chunkMaxTimer);
     if (isOn) {
-      // すぐ再起動（iOS対策: 250ms待ち）
       setTimeout(function(){
         if (isOn) {
           try {
@@ -462,7 +469,7 @@ function buildRecognition() {
             scheduleChunkRestart();
           } catch(e) {}
         }
-      }, 250);
+      }, 200);
     }
   };
 
@@ -475,16 +482,32 @@ function buildRecognition() {
   return r;
 }
 
-// 6秒ごとに stop() → onend → すぐ再起動
-// これによりiOSで大きなチャンクになるのを防ぎ、小さく頻繁にfinalが届く
-function scheduleChunkRestart() {
+// 無音を検知してリスタート（文の途中では絶対に切らない）
+// ・音声が届くたびに resetChunkTimer() でタイマーをリセット
+// ・PAUSE_MS 無音が続いたら stop() → onend → 即再起動
+// ・CHUNK_MAX を超えたら無音でも強制リスタート（安全弁）
+var chunkMaxTimer = null;
+
+function resetChunkTimer() {
+  // 無音タイマーをリセット（音声継続中は何もしない）
   clearTimeout(chunkTimer);
-  chunkTimer = setTimeout(function(){
+  chunkTimer = setTimeout(function() {
     if (isOn && recognition) {
       try { recognition.stop(); } catch(e) {}
-      // onend が自動再起動する
     }
-  }, CHUNK_MS);
+  }, PAUSE_MS);
+}
+
+function scheduleChunkRestart() {
+  // 最大待機タイマー（長時間無音ゼロでも一定時間後にリスタート）
+  clearTimeout(chunkMaxTimer);
+  chunkMaxTimer = setTimeout(function() {
+    if (isOn && recognition) {
+      try { recognition.stop(); } catch(e) {}
+    }
+  }, CHUNK_MAX);
+  // 無音タイマーも開始
+  resetChunkTimer();
 }
 
 function startListening() {
@@ -522,6 +545,7 @@ function startListening() {
 function stopListening() {
   isOn = false;
   clearTimeout(chunkTimer);
+  clearTimeout(chunkMaxTimer);
   if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
   clearInterval(elapsedLoop);
   stopMeter();
@@ -907,7 +931,7 @@ function copyModal(){
 function clearAll() {
   if (isOn) stopListening();
   fullText='';readPos=0;jpCount=0;startTime=null;recentJp=[];
-  speechStartAt=0;lagHistory=[];segments=[];
+  speechStartAt=0;lastSpeechAt=0;lagHistory=[];segments=[];
   summaryPos=0;summaryCount=0;summaryBusy=false;
   clearInterval(elapsedLoop);stopSummaryTimer();
 
