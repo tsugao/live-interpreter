@@ -309,11 +309,11 @@ var modalFilename = '';
 // ============================================================
 // 定数
 // ============================================================
-var MIN_WORDS           = 3;      // 翻訳開始最小語数
-var MIN_WORDS_COLD      = 4;      // 初回翻訳最小語数
-var MIN_WAIT_MS         = 200;    // 翻訳間の最短間隔
-var FORCE_MS            = 2000;   // 語数未満でも強制翻訳するタイムアウト
-var CONTEXT_WORDS       = 150;    // Claudeに渡す英語コンテキスト語数
+var MIN_WORDS           = 2;      // 翻訳開始最小語数（2語で即開始）
+var MIN_WORDS_COLD      = 2;      // 初回翻訳最小語数
+var MIN_WAIT_MS         = 100;    // 翻訳間の最短間隔 ms
+var FORCE_MS            = 1200;   // 語数未満でも強制翻訳するタイムアウト
+var CONTEXT_WORDS       = 150;    // Claudeに渡す英語コンテキスト語数（150語維持）
 var SUMMARY_INTERVAL_MS = 90000;
 var SUMMARY_MIN_WORDS   = 30;
 
@@ -489,6 +489,11 @@ function startListening() {
 
       renderTranscript();
       maybeTranslate(true);
+    } else if (interim.trim() && !translating) {
+      // isFinalを待たず、interimが6語以上なら即翻訳（速度最優先）
+      var iWords = interim.trim().split(/\s+/).filter(Boolean).length;
+      if (iWords >= 6 && speechStartAt === 0) speechStartAt = Date.now();
+      if (iWords >= 6) maybeTranslateInterim(interim.trim());
     }
 
     updateInterim(interim);
@@ -561,11 +566,13 @@ function maybeTranslate(immediate) {
   var wait  = Date.now() - lastTransAt;
 
   if (wait < MIN_WAIT_MS) return;
+  if (!chunk || words < 1) return;
 
   var threshold = recentJp.length === 0 ? MIN_WORDS_COLD : MIN_WORDS;
 
   if (words < threshold) {
-    if (words >= 2 && wait >= FORCE_MS) doTranslate();
+    // 1語でも1.2秒経過なら強制翻訳
+    if (words >= 1 && wait >= FORCE_MS) doTranslate();
     return;
   }
 
@@ -574,8 +581,23 @@ function maybeTranslate(immediate) {
   }
 }
 
-// 500ms ポーリング
-setInterval(function() { if (isOn && !translating) maybeTranslate(false); }, 500);
+// interim が十分長いとき、finalを待たず先行翻訳
+var lastInterimTranslated = '';
+function maybeTranslateInterim(interim) {
+  if (translating) return;
+  if (interim === lastInterimTranslated) return;
+  var wait = Date.now() - lastTransAt;
+  if (wait < MIN_WAIT_MS) return;
+  // interimをfullTextに一時追加して翻訳（finalが来たら上書きされる）
+  var combined = fullText + interim + ' ';
+  var chunk = combined.slice(readPos).trim();
+  if (chunk.split(/\s+/).filter(Boolean).length < 4) return;
+  lastInterimTranslated = interim;
+  doTranslateChunk(chunk, combined.length);
+}
+
+// 300ms ポーリング（速度優先）
+setInterval(function() { if (isOn && !translating) maybeTranslate(false); }, 300);
 
 // ============================================================
 // Claude API 翻訳
@@ -583,36 +605,41 @@ setInterval(function() { if (isOn && !translating) maybeTranslate(false); }, 500
 function doTranslate() {
   if (translating) return;
   var chunk = fullText.slice(readPos).trim();
-  if (!chunk || chunk.split(/\s+/).filter(Boolean).length < 2) return;
+  if (!chunk || chunk.split(/\s+/).filter(Boolean).length < 1) return;
+  doTranslateChunk(chunk, fullText.length);
+}
+
+function doTranslateChunk(chunk, snapshotLen) {
+  if (translating) return;
+  if (!chunk) return;
   var key = getKey();
   if (!key) return;
 
   translating     = true;
   var segStart    = readPos + (fullText.slice(readPos).length - fullText.slice(readPos).trimStart().length);
-  var snapshot    = fullText.length;
+  var snapshot    = snapshotLen;
   var batchStart  = speechStartAt > 0 ? speechStartAt : Date.now();
   lastTransAt     = Date.now();
 
   setBadge('b-ai', '🤖 翻訳中…', 'bwait');
 
-  // コンテキスト構築
-  var jpCtx  = recentJp.slice(-2).map(function(t){return t.slice(0,80);}).join(' ');
+  // コンテキスト構築（最短化 → API速度優先）
+  var jpCtx  = recentJp.length ? recentJp[recentJp.length-1].slice(0,50) : '';
   var prevEn = fullText.slice(0, readPos).trim()
                  .split(/\s+/).filter(Boolean).slice(-CONTEXT_WORDS).join(' ');
   var ctx    = getCtx();
 
-  var promptParts = [
-    '同時通訳: 英語を自然な日本語に意訳。訳文のみ・1〜3文・「。」で終わること。'
-  ];
-  if (ctx)    promptParts.push('[背景] ' + ctx);
-  if (jpCtx)  promptParts.push('[直近訳] ' + jpCtx);
-  if (prevEn) promptParts.push('[直前文脈] ' + prevEn);
-  promptParts.push('[訳して] ' + chunk);
+  // プロンプト: 極限まで短く
+  var promptParts = ['同時通訳。英語→日本語。訳文のみ。'];
+  if (ctx)    promptParts.push('[背景]' + ctx);
+  if (jpCtx)  promptParts.push('[前訳]' + jpCtx);
+  if (prevEn) promptParts.push('[文脈]' + prevEn);
+  promptParts.push('[訳]' + chunk);
   var prompt = promptParts.join('\n');
 
   claudeRequest({
     model:      'claude-haiku-4-5-20251001',
-    max_tokens: 300,
+    max_tokens: 200,
     messages:   [{ role: 'user', content: prompt }]
   }, 18000)
   .then(function(res) {
