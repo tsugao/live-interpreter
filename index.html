@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.15</title>
+  <title>🎙️ Live Interpreter v2.17</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.15 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.17 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.15 「確定訳は不変」アーキテクチャ
+// v2.17 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -399,7 +399,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.15）────────
+// ─── 日本語テキストレンダリング（v2.17）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -424,7 +424,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.15）─────────────────────
+// ─── タイプライター表示キュー（v2.17）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, revStart) {
@@ -796,7 +796,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.16 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.17 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -808,21 +808,23 @@ function doTranslate() {
 
   // センテンス境界を探す（. ! ? の直後）
   var sentEnd=findLastSentenceEnd(pending);
-  var translateEn, snapshot;
+  var translateEn, snapshot, isForcedTranslation;
   if(sentEnd>0) {
     translateEn=pending.slice(0,sentEnd).trim();
     snapshot=lastSnapPos+sentEnd;
+    isForcedTranslation=false; // センテンス境界あり → 末尾リビジョン不要
   } else {
     // 境界なし → FORCE_MSで強制翻訳（途中でも翻訳する）
     translateEn=pending.trim();
     snapshot=lastSnapPos+pending.length;
+    isForcedTranslation=true;  // 境界なし強制 → 末尾1文がぶつ切りの可能性 → リビジョン必要
   }
   if(!translateEn||translateEn.split(/\s+/).filter(Boolean).length<1) return;
 
-  // stableJp の末尾1文をリビジョン対象として抽出
-  var revStart=findRevisionStart(stableJp);
-  var revisionTail=stableJp.slice(revStart);          // 末尾1文（Claudeが小修正可）
-  var olderJpRef=stableJp.slice(0,revStart);          // それ以前（変更禁止・文体参照）
+  // リビジョン対象: 強制翻訳時のみ末尾1文を切り戻す。センテンス境界ありの場合は不要。
+  var revStart = isForcedTranslation ? findRevisionStart(stableJp) : stableJp.length;
+  var revisionTail = isForcedTranslation ? stableJp.slice(revStart) : ''; // 末尾1文（強制時のみ）
+  var olderJpRef = stableJp.slice(0, revStart);
   if(olderJpRef.length>200) olderJpRef='…'+olderJpRef.slice(-200);
 
   var contextEn=fullText.slice(0,lastSnapPos).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
