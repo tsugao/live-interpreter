@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.29</title>
+  <title>🎙️ Live Interpreter v2.30</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.29 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.30 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.29 「確定訳は不変」アーキテクチャ
+// v2.30 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -414,7 +414,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.29）────────
+// ─── 日本語テキストレンダリング（v2.30）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -442,7 +442,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.29）─────────────────────
+// ─── タイプライター表示キュー（v2.30）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, enEnd, revTail, batchStart) {
@@ -484,10 +484,10 @@ function startNextTypewriter() {
   // ③ 遅延計測: 音声入力開始 → タイプライター表示開始
   if(item.batchStart>0) {
     var lagSec=((Date.now()-item.batchStart)/1000).toFixed(1);
-    recordLag(parseFloat(lagSec));
+    recordLag(parseFloat(lagSec)); // s-lag には平均値を書き込む（recordLag内で計算）
     var lb=document.getElementById('jp-lag-badge');
-    if(lb) lb.textContent='⏱ '+lagSec+'s';
-    document.getElementById('s-lag').textContent=lagSec+'s';
+    if(lb) lb.textContent='⏱ '+lagSec+'s'; // バッジには個別の遅延値を表示
+    // ※ s-lag はrecordLagが平均値で更新するためここでは上書きしない
   }
 
   // ④ 400ms後: 今バッチの英語を紫ハイライト（旧が消えてから新が現れる — 視覚的に明確に分離）
@@ -897,7 +897,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.29 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.30 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
