@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.8</title>
+  <title>🎙️ Live Interpreter v2.9</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.8 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.9 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -550,6 +550,8 @@ function doTranslate() {
 
   translating=true;
   var snapshot=fullText.length;
+  // 翻訳開始時点のコミット状態を保存（翻訳中に変化する場合があるため）
+  var committedAtStart=isCommitted;
   var batchStart=speechStartAt>0?speechStartAt:Date.now();
   lastTransAt=Date.now();
   setBadge('b-ai','🤖 翻訳中…','bwait');
@@ -565,7 +567,9 @@ function doTranslate() {
   ];
   if(ctx)         parts.push('[背景] '+ctx);
   if(recentJpCtx) parts.push('[直近確定訳（文体・トーンを引き継ぐこと）] '+recentJpCtx.slice(-200));
-  if(activeJp) {
+  // [前回訳]は同一ブロック内の再翻訳のみ送る
+  // 新ブロック（committedAtStart=true）に送ると stableJp と activeJp が重複する原因になる
+  if(activeJp && !committedAtStart) {
     parts.push(
       '[前回訳] '+activeJp+'\n'
       +'※[前回訳]がある場合：文頭から最大限同じ表現を保て。'
@@ -588,14 +592,19 @@ function doTranslate() {
     var lagSec=((Date.now()-batchStart)/1000).toFixed(1);
     recordLag(parseFloat(lagSec));
     lastSnapPos=snapshot;
-    if(isCommitted) {
-      // コミット済みの activeJp を stableJp へ移動（下線なし領域へ）
+    if(committedAtStart) {
+      // 翻訳開始時点で新ブロック → 旧activeJpをstableへ移動、jpは新内容の新鮮な訳
       stableJp+=activeJp;
       isCommitted=false;
-      prevActiveJp=''; // 新ブロック → 全体下線（初回のみ）
+      prevActiveJp=''; // 新ブロック初回 → 全体下線
+    } else if(isCommitted) {
+      // 翻訳中にコミットが発生したケース
+      // jpは旧activeEnを翻訳したもの（stableJpと内容が重なる可能性）
+      // → stableへは移動しない。次の翻訳でcommittedAtStart=trueになってから移動する
+      if(jp!==activeJp) prevActiveJp=activeJp;
+      // isCommitted=true のまま維持（次回のdoTranslateでcommittedAtStart=trueになる）
     } else {
-      // 翻訳内容が変化した場合のみ prevActiveJp を更新
-      // 変化がない場合は prevActiveJp を保持 → 既存の下線表示を維持
+      // 同一ブロック内の更新：内容が変化した場合のみ prevActiveJp を更新
       if(jp!==activeJp) prevActiveJp=activeJp;
     }
     activeJp=jp;
