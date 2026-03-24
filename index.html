@@ -13,11 +13,10 @@
       --accent:#4dabf7; --green:#40c057; --red:#fa5252;
       --yellow:#ffd43b; --purple:#cc5de8; --muted:#7a7a9a; --text:#e0e0e0;
     }
-    html, body { height:100%; overflow:hidden; background:var(--bg); }
+    html,body { height:100%; overflow:hidden; background:var(--bg); }
     body { font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;
            color:var(--text); display:flex; flex-direction:column; }
 
-    /* ── Header ── */
     header { background:var(--panel); border-bottom:1px solid var(--border);
              padding:9px 13px; display:flex; align-items:center;
              justify-content:space-between; flex-shrink:0; gap:8px; }
@@ -26,7 +25,6 @@
                     border:1px solid var(--border); border-radius:12px;
                     padding:4px 10px; cursor:pointer; flex-shrink:0; }
 
-    /* ── Setup Panel ── */
     #setup-panel { background:var(--panel2); border-bottom:2px solid var(--accent);
                    padding:11px 13px; flex-shrink:0; }
     .setup-row { display:flex; align-items:flex-start; gap:8px; margin-bottom:7px; }
@@ -42,7 +40,6 @@
                  border-radius:6px; font-size:11px; color:#69db7c; line-height:1.55;
                  border-left:3px solid #40c057; }
 
-    /* ── Status Bar ── */
     #statusbar { background:var(--panel2); border-bottom:1px solid var(--border);
                  padding:4px 13px; display:flex; gap:7px; align-items:center;
                  flex-shrink:0; flex-wrap:wrap; }
@@ -53,12 +50,10 @@
     .stat  { font-size:11px; color:var(--muted); }
     .stat b { color:var(--accent); }
 
-    /* ── Error Bar ── */
     #err { display:none; background:#3a1a1a; color:var(--red);
            padding:5px 13px; font-size:12px; flex-shrink:0; }
     #err.show { display:block; }
 
-    /* ── Tabs ── */
     #tabs { background:var(--panel); border-bottom:1px solid var(--border);
             display:flex; flex-shrink:0; }
     .tab-btn { flex:1; padding:9px 4px; border:none; background:none;
@@ -67,12 +62,10 @@
                -webkit-touch-callout:none; -webkit-user-select:none; }
     .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
 
-    /* ── Main area ── */
     #main { flex:1; min-height:0; overflow:hidden; position:relative; }
     .tab-pane { position:absolute; inset:0; display:none; flex-direction:column; }
     .tab-pane.active { display:flex; }
 
-    /* ── Split layout (メイン tab) ── */
     #split-top { flex:0 0 34%; min-height:0; overflow-y:scroll; padding:8px 12px 6px;
                  -webkit-overflow-scrolling:touch; background:var(--bg); }
     #split-divider { flex-shrink:0; height:28px; background:var(--panel2);
@@ -85,32 +78,37 @@
     #split-bottom { flex:1; min-height:0; overflow-y:scroll; padding:8px 12px 12px;
                     -webkit-overflow-scrolling:touch; }
 
-    /* Summary tab */
     #tab-summary { overflow-y:scroll; -webkit-overflow-scrolling:touch;
                    padding:10px 12px 14px; }
 
-    /* ── Transcript ── */
-    #transcript-committed { font-size:13px; line-height:1.85; color:#bbb;
-                             white-space:pre-wrap; word-break:break-word; }
-    #transcript-interim   { font-size:13px; line-height:1.85; color:var(--yellow);
-                             white-space:pre-wrap; word-break:break-word; opacity:.8; }
+    /* 英語原文 */
+    #transcript-committed { font-size:13px; line-height:1.9; color:#bbb;
+                             word-break:break-word; }
+    #transcript-interim   { font-size:13px; line-height:1.9; color:var(--yellow);
+                             word-break:break-word; opacity:.8; }
+    /* ハイライトスタイル */
+    .hl-latest { background:rgba(204,93,232,0.40); border-bottom:2px solid #cc5de8;
+                 border-radius:3px; padding:1px 2px; }
+    .hl-prev   { background:rgba(77,171,247,0.15); border-bottom:1px solid #4dabf755;
+                 border-radius:3px; padding:1px 2px; }
 
-    /* ── Translation Cards ── */
+    /* 翻訳カード */
     .jp-card { background:var(--panel2); border:1px solid #4dabf722;
                border-radius:10px; padding:11px 13px; margin-bottom:9px;
                animation:fi .25s ease; }
+    .jp-card.latest { border-color:var(--purple); box-shadow:0 0 10px #cc5de844; }
     @keyframes fi { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
     .jp-meta { font-size:10px; color:var(--muted); margin-bottom:5px;
-               display:flex; justify-content:space-between; align-items:center; gap:4px; }
+               display:flex; justify-content:space-between; align-items:center; }
     .jp-lag  { background:#1a1a2e; border:1px solid var(--border); border-radius:8px;
-               padding:1px 6px; font-size:10px; color:var(--accent); white-space:nowrap; }
+               padding:1px 6px; font-size:10px; color:var(--purple); }
     .jp-text { font-size:16px; line-height:1.85; color:#e8f4ff; }
     .jp-src  { margin-top:6px; padding-top:6px; border-top:1px solid var(--border);
                font-size:11px; color:var(--muted); line-height:1.5; }
     #jp-ph   { color:var(--muted); font-size:12px; text-align:center;
                padding:32px 0; line-height:1.8; }
 
-    /* ── Summary Cards ── */
+    /* 要約カード */
     .smr-card { background:var(--panel2); border:1px solid #40c05733;
                 border-radius:10px; padding:12px 13px; margin-bottom:9px; animation:fi .3s ease; }
     .smr-card.loading { opacity:.65; }
@@ -133,7 +131,6 @@
     #sum-cd  { font-size:11px; color:var(--muted); }
     #sum-ph  { color:var(--muted); font-size:12px; text-align:center; padding:40px 0; line-height:1.8; }
 
-    /* ── Save Modal (iOS share fallback) ── */
     #save-modal { display:none; position:fixed; inset:0; background:#000a; z-index:100;
                   align-items:flex-end; }
     #save-modal.open { display:flex; }
@@ -146,12 +143,10 @@
                         -webkit-overflow-scrolling:touch; white-space:pre-wrap; }
     #save-modal-btns  { display:flex; gap:8px; }
 
-    /* ── Save Status ── */
     #save-status { display:none; background:#1a2a3a; color:var(--accent);
                    padding:7px 13px; font-size:12px; text-align:center;
                    flex-shrink:0; border-top:1px solid #4dabf744; }
 
-    /* ── Control Bar ── */
     #ctrl-bar { background:var(--panel); border-top:1px solid var(--border);
                 padding:9px 12px; display:flex; gap:6px; flex-shrink:0;
                 justify-content:center; flex-wrap:wrap; }
@@ -171,7 +166,6 @@
 </head>
 <body>
 
-<!-- ── Header ── -->
 <header>
   <h1>🎙️ Live Interpreter
     <span style="font-size:10px;color:var(--muted);font-weight:normal"> Claude</span>
@@ -179,7 +173,6 @@
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
 
-<!-- ── Setup Panel ── -->
 <div id="setup-panel">
   <div class="setup-row">
     <span class="setup-label">🤖 Claude Key</span>
@@ -197,7 +190,6 @@
   </div>
 </div>
 
-<!-- ── Status Bar ── -->
 <div id="statusbar">
   <div class="badge boff" id="b-mic">🎙 OFF</div>
   <div class="badge boff" id="b-ai">🤖 待機</div>
@@ -207,44 +199,31 @@
   <div class="stat"><b id="s-el">00:00</b></div>
 </div>
 
-<!-- ── Error ── -->
 <div id="err"></div>
 
-<!-- ── Tabs ── -->
 <div id="tabs">
   <button class="tab-btn active" onclick="switchTab('main')">🎙 メイン</button>
   <button class="tab-btn"        onclick="switchTab('summary')">🧠 まとめ</button>
 </div>
 
-<!-- ── Main content ── -->
 <div id="main">
-
-  <!-- メイン: 上=英語原文 / 下=日本語翻訳 -->
   <div id="tab-main" class="tab-pane active">
-
-    <!-- 英語原文エリア -->
     <div id="split-top">
       <div id="transcript-committed" style="color:#555">（英語音声をここに表示）</div>
       <div id="transcript-interim"></div>
     </div>
-
-    <!-- 仕切り -->
     <div id="split-divider">
       <span id="split-divider-label">🇯🇵 日本語翻訳</span>
       <span id="rec-inline"></span>
     </div>
-
-    <!-- 日本語翻訳エリア -->
     <div id="split-bottom">
       <div id="jp-ph">
         翻訳結果がここに表示されます<br>
         <span style="font-size:10px;opacity:.5">録音開始後、数秒で最初の翻訳が届きます</span>
       </div>
     </div>
-
   </div>
 
-  <!-- まとめタブ -->
   <div id="tab-summary" class="tab-pane">
     <div id="sum-hdr">
       <span id="sum-cd"></span>
@@ -256,13 +235,10 @@
       英語全文を解析して全体像をまとめます
     </div>
   </div>
-
 </div>
 
-<!-- ── Save Status ── -->
 <div id="save-status"></div>
 
-<!-- ── Control Bar ── -->
 <div id="ctrl-bar">
   <button class="btn g" id="start-btn" onclick="startListening()">▶ 開始</button>
   <button class="btn r" id="stop-btn"  onclick="stopListening()" disabled>⏹ 停止</button>
@@ -270,7 +246,6 @@
   <button class="btn p"               onclick="clearAll()">🗑</button>
 </div>
 
-<!-- ── Save Modal (iOS用フォールバック) ── -->
 <div id="save-modal">
   <div id="save-modal-inner">
     <div id="save-modal-title">📄 保存内容</div>
@@ -288,67 +263,66 @@
 // ============================================================
 // 状態変数
 // ============================================================
-let isOn           = false;
-let fullText       = '';      // 確定済み英語テキスト全体
-let startTime      = null;
-let elapsedLoop    = null;
-let jpCount        = 0;
+var isOn          = false;
+var fullText      = '';       // 確定済み英語テキスト全体
+var startTime     = null;
+var elapsedLoop   = null;
+var jpCount       = 0;
 
 // 翻訳制御
-let readPos        = 0;       // 翻訳済み末尾位置
-let lastTranslated = 0;       // 最後に翻訳を開始した時刻
-let translating    = false;
+var readPos       = 0;        // 翻訳済み末尾の文字位置
+var lastTransAt   = 0;        // 最後に翻訳を開始した時刻 (ms)
+var translating   = false;
 
-// タイムラグ計測（正確な音声入力開始〜翻訳表示までの計測）
-let batchArrivalTime  = 0;    // 現在の未翻訳バッチの最初のfinalテキスト到着時刻
-let lastFinalArrival  = 0;    // 最後にfinalテキストが届いた時刻（次バッチ追跡用）
-let lagHistory        = [];   // 直近のタイムラグ記録 (秒)
+// タイムラグ計測
+// speechStartAt: 現バッチの最初のfinalテキストが届いた時刻
+// 翻訳完了後にリセット、次の発話で再セット
+var speechStartAt = 0;
+var lagHistory    = [];
 
 // 翻訳済みセグメント（英語ハイライト用）
-let translatedSegments = [];  // {start, end} — 文字位置
-// ハイライト色: 最新=紫、それ以外=薄青
-const HL_LATEST_BG     = 'rgba(204,93,232,0.45)';
-const HL_LATEST_BORDER = '#cc5de8';
-const HL_PREV_BG       = 'rgba(77,171,247,0.18)';
-const HL_PREV_BORDER   = '#4dabf755';
+// [{start: 文字位置, end: 文字位置}]
+var segments      = [];
 
-// interim テキスト保持（翻訳後に消えないよう）
-let currentInterim = '';
+// 直近のinterim（翻訳後も消えないよう保持）
+var lastInterim   = '';
 
 // コンテキスト
-let recentJpTrans  = [];      // 直近の日本語訳（文脈用）
+var recentJp      = [];       // 直近の日本語訳（文脈用）
 
 // 要約制御
-let summaryPos     = 0;
-let summaryCount   = 0;
-let summaryBusy    = false;
-let summaryTimerId = null;
-let sumCdId        = null;
-let summaryNextAt  = 0;
+var summaryPos    = 0;
+var summaryCount  = 0;
+var summaryBusy   = false;
+var summaryTimer  = null;
+var sumCdTimer    = null;
+var summaryNextAt = 0;
 
-// SpeechRecognition
-let recognition    = null;
-let meterAnim      = null;
+// SpeechRecognition / meter
+var recognition   = null;
+var meterAnim     = null;
 
 // 保存モーダル
-let modalContent   = '';
-let modalFilename  = '';
+var modalContent  = '';
+var modalFilename = '';
 
-// ── 定数（翻訳速度チューニング — 超高速設定）──
-const MIN_WORDS           = 3;     // 翻訳開始語数（3語で即開始）
-const MIN_WORDS_COLDSTART = 4;     // 初回翻訳語数
-const MIN_WAIT            = 200;   // 翻訳間の最短間隔 ms（極限まで短縮）
-const FORCE_TRANSLATE_MS  = 2000;  // 語数未満でも強制翻訳する待機時間 ms
-const CONTEXT_WORDS       = 150;   // Claude に渡す英語コンテキスト語数（文脈理解のため150語維持）
-const SUMMARY_INTERVAL    = 90000; // 要約間隔 ms
-const SUMMARY_MIN_WORDS   = 30;
+// ============================================================
+// 定数
+// ============================================================
+var MIN_WORDS           = 3;      // 翻訳開始最小語数
+var MIN_WORDS_COLD      = 4;      // 初回翻訳最小語数
+var MIN_WAIT_MS         = 200;    // 翻訳間の最短間隔
+var FORCE_MS            = 2000;   // 語数未満でも強制翻訳するタイムアウト
+var CONTEXT_WORDS       = 150;    // Claudeに渡す英語コンテキスト語数
+var SUMMARY_INTERVAL_MS = 90000;
+var SUMMARY_MIN_WORDS   = 30;
 
 // ============================================================
 // 初期化
 // ============================================================
 (function init() {
-  const ck  = localStorage.getItem('claude_key')      || '';
-  const ctx = localStorage.getItem('session_context') || '';
+  var ck  = localStorage.getItem('claude_key')      || '';
+  var ctx = localStorage.getItem('session_context') || '';
   if (ck)  document.getElementById('claude-key').value      = ck;
   if (ctx) document.getElementById('session-context').value = ctx;
   if (ck)  document.getElementById('setup-panel').style.display = 'none';
@@ -358,149 +332,206 @@ const SUMMARY_MIN_WORDS   = 30;
 // UI ユーティリティ
 // ============================================================
 function toggleSetup() {
-  const p = document.getElementById('setup-panel');
-  p.style.display = (p.style.display === 'none') ? 'block' : 'none';
+  var p = document.getElementById('setup-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
 }
 function saveKeys() {
-  const ck = document.getElementById('claude-key').value.trim();
-  if (ck) localStorage.setItem('claude_key', ck);
+  var k = document.getElementById('claude-key').value.trim();
+  if (k) localStorage.setItem('claude_key', k);
 }
 function saveContext() {
   localStorage.setItem('session_context', document.getElementById('session-context').value);
 }
-function getKey()  { return document.getElementById('claude-key').value.trim() || localStorage.getItem('claude_key') || ''; }
-function getCtx()  { return document.getElementById('session-context').value.trim() || ''; }
-
-function switchTab(name) {
-  document.querySelectorAll('.tab-btn').forEach((b, i) =>
-    b.classList.toggle('active', ['main','summary'][i] === name));
-  document.querySelectorAll('.tab-pane').forEach(p =>
-    p.classList.toggle('active', p.id === 'tab-' + name));
+function getKey() {
+  return document.getElementById('claude-key').value.trim()
+      || localStorage.getItem('claude_key') || '';
 }
-
+function getCtx() {
+  return document.getElementById('session-context').value.trim() || '';
+}
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(function(b, i) {
+    b.classList.toggle('active', ['main','summary'][i] === name);
+  });
+  document.querySelectorAll('.tab-pane').forEach(function(p) {
+    p.classList.toggle('active', p.id === 'tab-' + name);
+  });
+}
 function setBadge(id, text, cls) {
-  const el = document.getElementById(id);
+  var el = document.getElementById(id);
   if (el) { el.textContent = text; el.className = 'badge ' + cls; }
 }
 function showErr(msg) {
-  const el = document.getElementById('err');
+  var el = document.getElementById('err');
   el.textContent = msg; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 9000);
+  setTimeout(function() { el.classList.remove('show'); }, 9000);
 }
-function showSaveStatus(msg, autoHide = false, ms = 0) {
-  const el = document.getElementById('save-status');
+function showSaveStatus(msg, autoHide, ms) {
+  var el = document.getElementById('save-status');
   el.textContent = msg; el.style.display = 'block';
-  if (autoHide) setTimeout(() => { el.style.display = 'none'; }, ms || 5000);
+  if (autoHide) setTimeout(function() { el.style.display = 'none'; }, ms || 5000);
 }
 function updateElapsed() {
   if (!startTime) return;
-  const s = Math.floor((Date.now() - startTime) / 1000);
+  var s = Math.floor((Date.now() - startTime) / 1000);
   document.getElementById('s-el').textContent =
     String(Math.floor(s / 60)).padStart(2,'0') + ':' + String(s % 60).padStart(2,'0');
 }
-function _updateBtns(rec) {
+function updateBtns(rec) {
   document.getElementById('start-btn').disabled = rec;
   document.getElementById('stop-btn').disabled  = !rec;
   document.getElementById('start-btn').textContent = rec ? '🔴 録音中' : '▶ 開始';
 }
 function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-// 平均タイムラグ更新
 function recordLag(sec) {
   lagHistory.push(sec);
   if (lagHistory.length > 10) lagHistory.shift();
-  const avg = (lagHistory.reduce((a,b) => a+b, 0) / lagHistory.length).toFixed(1);
-  document.getElementById('s-lag').textContent = avg;
+  var avg = lagHistory.reduce(function(a,b){return a+b;},0) / lagHistory.length;
+  document.getElementById('s-lag').textContent = avg.toFixed(1);
 }
 
 // ============================================================
-// 録音ステータス（仕切り行に表示）
+// 録音インジケータ
 // ============================================================
 function startMeter() {
-  meterAnim = setInterval(() => {
-    const inline = document.getElementById('rec-inline');
-    if (!inline) return;
-    const dots = ['●○○','○●○','○○●'][Math.floor(Date.now()/400)%3];
-    inline.textContent = isOn ? `🔴 ${dots}` : '';
+  meterAnim = setInterval(function() {
+    var el = document.getElementById('rec-inline');
+    if (!el) return;
+    var dots = ['●○○','○●○','○○●'][Math.floor(Date.now()/400)%3];
+    el.textContent = isOn ? '🔴 ' + dots : '';
   }, 400);
 }
 function stopMeter() {
   clearInterval(meterAnim);
-  const inline = document.getElementById('rec-inline');
-  if (inline) inline.textContent = '';
+  var el = document.getElementById('rec-inline');
+  if (el) el.textContent = '';
 }
 
 // ============================================================
-// Web Speech API 音声認識
+// 英語原文の表示（ハイライト付き）
+// ============================================================
+function renderTranscript() {
+  var el = document.getElementById('transcript-committed');
+  if (!fullText) {
+    el.innerHTML = '';
+    return;
+  }
+  var html = '';
+  var pos  = 0;
+  var last = segments.length - 1;
+
+  for (var i = 0; i < segments.length; i++) {
+    var seg = segments[i];
+    // セグメント前のギャップ（通常は空白のみ）
+    if (pos < seg.start) {
+      html += esc(fullText.slice(pos, seg.start));
+    }
+    var cls = (i === last) ? 'hl-latest' : 'hl-prev';
+    html += '<span class="' + cls + '">'
+          + esc(fullText.slice(seg.start, seg.end))
+          + '</span>';
+    pos = seg.end;
+  }
+  // 未翻訳の残り
+  if (pos < fullText.length) {
+    html += esc(fullText.slice(pos));
+  }
+
+  el.innerHTML   = html;
+  el.style.color = '#bbb';
+
+  // 最下部スクロール
+  var top = document.getElementById('split-top');
+  requestAnimationFrame(function() { top.scrollTop = top.scrollHeight; });
+}
+
+function updateInterim(interim) {
+  lastInterim = interim || '';
+  document.getElementById('transcript-interim').textContent = lastInterim;
+}
+
+// ============================================================
+// Web Speech API
 // ============================================================
 function startListening() {
   if (isOn) return;
   if (!getKey()) { showErr('⚠️ Claude API Keyを設定してください'); toggleSetup(); return; }
 
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { showErr('⚠️ このブラウザは音声認識に対応していません（Safari / Chrome を使用）'); return; }
 
-  recognition               = new SR();
-  recognition.lang          = 'en-US';
-  recognition.continuous    = true;
+  recognition                = new SR();
+  recognition.lang           = 'en-US';
+  recognition.continuous     = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
 
-  // ── 認識結果 ──
-  recognition.onresult = (event) => {
-    let interim = '';
-    let final_  = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const t = event.results[i][0].transcript;
+  recognition.onresult = function(event) {
+    var interim = '';
+    var final_  = '';
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      var t = event.results[i][0].transcript;
       if (event.results[i].isFinal) final_ += t;
       else interim += t;
     }
 
     if (final_.trim()) {
-      // バッチ開始時刻: 0のときだけ記録（=新バッチの最初の語が届いた瞬間）
-      if (batchArrivalTime === 0) batchArrivalTime = Date.now();
-      lastFinalArrival = Date.now();
+      // speechStartAt: 0のときだけセット（バッチの最初の語の到着時刻）
+      if (speechStartAt === 0) speechStartAt = Date.now();
 
       fullText += final_.trim() + ' ';
       document.getElementById('s-words').textContent =
         fullText.trim().split(/\s+/).filter(Boolean).length;
-      // 確定テキスト → 即座に翻訳チェック
+
+      renderTranscript();
       maybeTranslate(true);
     }
 
-    // interim を保持して原文エリアを更新
-    currentInterim = interim;
-    updateTranscriptView(interim);
+    updateInterim(interim);
   };
 
-  // ── 終了 → iOS 対策で自動再起動 ──
-  recognition.onend = () => {
-    if (isOn) setTimeout(() => {
-      if (isOn && recognition) try { recognition.start(); } catch(e) {}
-    }, 250);
+  recognition.onend = function() {
+    if (isOn) {
+      setTimeout(function() {
+        if (isOn && recognition) {
+          try { recognition.start(); } catch(e) {}
+        }
+      }, 250);
+    }
   };
 
-  recognition.onerror = (ev) => {
-    if (['no-speech','aborted'].includes(ev.error)) return;
-    if (ev.error === 'network') { showErr('⚠️ ネットワークエラー（インターネット接続が必要です）'); return; }
+  recognition.onerror = function(ev) {
+    if (ev.error === 'no-speech' || ev.error === 'aborted') return;
+    if (ev.error === 'network') {
+      showErr('⚠️ ネットワークエラー（インターネット接続が必要です）');
+      return;
+    }
     console.warn('[STT]', ev.error);
   };
 
-  isOn = true;
-  lastTranslated = Date.now();
-  batchArrivalTime = 0;  // 発話が来た瞬間にセットする（録音開始時刻は含めない）
+  isOn         = true;
+  lastTransAt  = Date.now();
+  speechStartAt = 0;
 
-  try { recognition.start(); }
-  catch(e) { isOn = false; showErr('⚠️ 音声認識開始失敗: ' + e.message); return; }
+  try {
+    recognition.start();
+  } catch(e) {
+    isOn = false;
+    showErr('⚠️ 音声認識開始失敗: ' + e.message);
+    return;
+  }
 
-  if (!startTime) { startTime = Date.now(); elapsedLoop = setInterval(updateElapsed, 1000); }
-
+  if (!startTime) {
+    startTime   = Date.now();
+    elapsedLoop = setInterval(updateElapsed, 1000);
+  }
   setBadge('b-mic', '🔴 認識中', 'bon');
-  _updateBtns(true);
+  updateBtns(true);
   document.getElementById('setup-panel').style.display = 'none';
-
   startMeter();
   startSummaryTimer();
 }
@@ -511,491 +542,439 @@ function stopListening() {
   clearInterval(elapsedLoop);
   stopMeter();
   setBadge('b-mic', '⏹ 停止', 'boff');
-  currentInterim = '';
-  document.getElementById('transcript-interim').textContent = '';
-  _updateBtns(false);
+  updateInterim('');
+  updateBtns(false);
   stopSummaryTimer();
 }
 
-// ── 英語ハイライト付き原文ビルド ──
-// 最新セグメント=紫、過去セグメント=薄青、未翻訳=通常色
-function buildHighlightedTranscript() {
-  if (!fullText) return '';
-  let html = '';
-  let pos = 0;
-  const lastIdx = translatedSegments.length - 1;
-
-  for (let i = 0; i < translatedSegments.length; i++) {
-    const seg = translatedSegments[i];
-    const isLatest = (i === lastIdx);
-    const bg  = isLatest ? HL_LATEST_BG     : HL_PREV_BG;
-    const bdr = isLatest ? HL_LATEST_BORDER  : HL_PREV_BORDER;
-
-    // セグメント前のギャップ
-    if (pos < seg.start) {
-      html += esc(fullText.slice(pos, seg.start));
-    }
-    html += `<span style="background:${bg};border-radius:3px;padding:1px 2px;`
-          + `border-bottom:2px solid ${bdr}">`
-          + esc(fullText.slice(seg.start, seg.end))
-          + `</span>`;
-    pos = seg.end;
-  }
-
-  // 未翻訳テキスト
-  if (pos < fullText.length) {
-    html += esc(fullText.slice(pos));
-  }
-
-  return html;
-}
-
-// 原文エリア更新（ハイライト付き）
-function updateTranscriptView(interim) {
-  const committed = document.getElementById('transcript-committed');
-  if (fullText.trim()) {
-    committed.innerHTML = buildHighlightedTranscript();
-    committed.style.color = '#bbb';
-  }
-  document.getElementById('transcript-interim').textContent = interim || '';
-  // 常に最下部にスクロール
-  const top = document.getElementById('split-top');
-  requestAnimationFrame(() => { top.scrollTop = top.scrollHeight; });
-}
-
 // ============================================================
-// 翻訳タイミング制御（高速化）
+// 翻訳タイミング制御
 // ============================================================
-function hasCompleteSentence(text) {
-  return /[.!?](\s|$)/.test(text.trim());
-}
-function ensureJpComplete(text) {
-  if (!text) return text;
-  const t = text.trim();
-  if (/[。！？]$/.test(t)) return t;
-  const last = Math.max(t.lastIndexOf('。'), t.lastIndexOf('！'), t.lastIndexOf('？'));
-  if (last > 0 && last >= t.length * 0.3) return t.slice(0, last + 1);
-  return t + '。';
+function hasSentenceEnd(text) {
+  return /[.!?](\s|$)/.test(text);
 }
 
-// immediate=true のとき語数チェックをやや緩める
-function maybeTranslate(immediate = false) {
+function maybeTranslate(immediate) {
   if (translating) return;
-  const chunk = fullText.slice(readPos).trim();
-  const words = chunk.split(/\s+/).filter(Boolean).length;
-  const wait  = Date.now() - lastTranslated;
+  var chunk = fullText.slice(readPos).trim();
+  var words = chunk.split(/\s+/).filter(Boolean).length;
+  var wait  = Date.now() - lastTransAt;
 
-  if (wait < MIN_WAIT) return;
+  if (wait < MIN_WAIT_MS) return;
 
-  const isColdStart = (recentJpTrans.length === 0);
-  const threshold   = isColdStart ? MIN_WORDS_COLDSTART : MIN_WORDS;
+  var threshold = recentJp.length === 0 ? MIN_WORDS_COLD : MIN_WORDS;
 
   if (words < threshold) {
-    // 強制翻訳タイムアウト（2秒待てば2語でも翻訳）
-    if (words >= 2 && wait >= FORCE_TRANSLATE_MS) { doTranslate(); return; }
+    if (words >= 2 && wait >= FORCE_MS) doTranslate();
     return;
   }
 
-  // 文末があればすぐ翻訳、なければ immediate か強制タイムアウト
-  if (hasCompleteSentence(chunk) || immediate || wait >= FORCE_TRANSLATE_MS) {
+  if (hasSentenceEnd(chunk) || immediate || wait >= FORCE_MS) {
     doTranslate();
   }
 }
 
-// 定期チェック（500ms間隔 — 超高速）
-setInterval(() => { if (isOn && !translating) maybeTranslate(); }, 500);
+// 500ms ポーリング
+setInterval(function() { if (isOn && !translating) maybeTranslate(false); }, 500);
 
 // ============================================================
-// Claude API 翻訳（超短プロンプトで低遅延化）
+// Claude API 翻訳
 // ============================================================
-async function doTranslate() {
+function doTranslate() {
   if (translating) return;
-  const chunk = fullText.slice(readPos).trim();
+  var chunk = fullText.slice(readPos).trim();
   if (!chunk || chunk.split(/\s+/).filter(Boolean).length < 2) return;
-
-  const key = getKey();
+  var key = getKey();
   if (!key) return;
 
-  translating = true;
-  const prevReadPos         = readPos;              // ハイライト用に保存
-  const snapshot            = fullText.length;
-  const capturedBatchStart  = batchArrivalTime > 0 ? batchArrivalTime : Date.now();
-  lastTranslated            = Date.now();
+  translating     = true;
+  var segStart    = readPos + (fullText.slice(readPos).length - fullText.slice(readPos).trimStart().length);
+  var snapshot    = fullText.length;
+  var batchStart  = speechStartAt > 0 ? speechStartAt : Date.now();
+  lastTransAt     = Date.now();
+
   setBadge('b-ai', '🤖 翻訳中…', 'bwait');
 
-  // ── コンテキスト構築 ──
-  // 日本語コンテキストは直近2件・各80字まで（速度優先）
-  const jpCtx  = recentJpTrans.slice(-2).map(t => t.slice(0,80)).join(' ');
-  const prevEn = fullText.slice(0, readPos).trim()
-                  .split(/\s+/).filter(Boolean).slice(-CONTEXT_WORDS).join(' ');
-  const ctx    = getCtx();
+  // コンテキスト構築
+  var jpCtx  = recentJp.slice(-2).map(function(t){return t.slice(0,80);}).join(' ');
+  var prevEn = fullText.slice(0, readPos).trim()
+                 .split(/\s+/).filter(Boolean).slice(-CONTEXT_WORDS).join(' ');
+  var ctx    = getCtx();
 
-  // ── 超短プロンプト（トークン削減 → 速度向上）──
-  const prompt = [
-    '同時通訳: 英語を自然な日本語に意訳。訳文のみ・1〜3文・「。」で終わること。',
-    ctx    ? `[背景] ${ctx}`           : '',
-    jpCtx  ? `[直近訳] ${jpCtx}`      : '',
-    prevEn ? `[直前文脈] ${prevEn}` : '',
-    `[訳して] ${chunk}`,
-  ].filter(Boolean).join('\n');
+  var promptParts = [
+    '同時通訳: 英語を自然な日本語に意訳。訳文のみ・1〜3文・「。」で終わること。'
+  ];
+  if (ctx)    promptParts.push('[背景] ' + ctx);
+  if (jpCtx)  promptParts.push('[直近訳] ' + jpCtx);
+  if (prevEn) promptParts.push('[直前文脈] ' + prevEn);
+  promptParts.push('[訳して] ' + chunk);
+  var prompt = promptParts.join('\n');
 
-  try {
-    const res = await claudeRequest({
-      model:      'claude-haiku-4-5-20251001',
-      max_tokens: 280,     // さらに削減して応答を速く
-      messages:   [{ role:'user', content: prompt }],
-    }, 18000);
-
-    const rawJp = res?.content?.[0]?.text?.trim() || '';
+  claudeRequest({
+    model:      'claude-haiku-4-5-20251001',
+    max_tokens: 300,
+    messages:   [{ role: 'user', content: prompt }]
+  }, 18000)
+  .then(function(res) {
+    var rawJp = (res && res.content && res.content[0] && res.content[0].text)
+                ? res.content[0].text.trim() : '';
     if (!rawJp) throw new Error('翻訳結果が空です');
 
-    const jpText = ensureJpComplete(rawJp);
+    var jpText = ensureComplete(rawJp);
 
-    // ── タイムラグ計測（音声入力開始 → 翻訳表示）──
-    const lagSec = ((Date.now() - capturedBatchStart) / 1000).toFixed(1);
+    // タイムラグ
+    var lagSec = ((Date.now() - batchStart) / 1000).toFixed(1);
     recordLag(parseFloat(lagSec));
 
-    // ── セグメント登録（英語ハイライト用）──
-    // 先頭の空白を除いた実際の開始位置を求める
-    const leadingSpaces = fullText.slice(prevReadPos).length
-                        - fullText.slice(prevReadPos).trimStart().length;
-    translatedSegments.push({ start: prevReadPos + leadingSpaces, end: snapshot });
-
+    // セグメント登録（英語ハイライト）
+    segments.push({ start: segStart, end: snapshot });
     readPos = snapshot;
 
-    // バッチ到着時刻リセット（次の発話で 0 から再計測）
-    batchArrivalTime = 0;
+    // バッチ開始時刻リセット（次の発話で再セット）
+    speechStartAt = 0;
 
     setBadge('b-ai', '🤖 完了', 'bon');
-    recentJpTrans.push(jpText);
-    if (recentJpTrans.length > 8) recentJpTrans.shift();
+    recentJp.push(jpText);
+    if (recentJp.length > 8) recentJp.shift();
 
     jpCount++;
     document.getElementById('s-trans').textContent = jpCount;
+
     addJpCard(jpText, chunk, lagSec);
+    renderTranscript();  // ハイライト更新
 
-    // ハイライト更新（currentInterim を保持して interim を消さない）
-    updateTranscriptView(currentInterim);
-
-  } catch(e) {
-    if (e.name !== 'AbortError') {
+  })
+  .catch(function(e) {
+    if (e && e.name !== 'AbortError') {
       showErr('⚠️ 翻訳エラー: ' + e.message);
       setBadge('b-ai', '⚠️ エラー', 'boff');
     }
-  } finally {
+  })
+  .finally(function() {
     translating = false;
-    // 翻訳完了直後に次のテキストをすぐチェック（パイプライン化）
-    setTimeout(() => maybeTranslate(false), 80);
-  }
+    setTimeout(function() { maybeTranslate(false); }, 100);
+  });
 }
 
-// ── 翻訳カードを追加（最新=紫、過去=薄く）──
+function ensureComplete(text) {
+  var t = text.trim();
+  if (!t) return t;
+  if (/[。！？]$/.test(t)) return t;
+  var last = Math.max(t.lastIndexOf('。'), t.lastIndexOf('！'), t.lastIndexOf('？'));
+  if (last > 0 && last >= t.length * 0.3) return t.slice(0, last + 1);
+  return t + '。';
+}
+
+// ============================================================
+// 翻訳カード追加（最新=紫、過去=薄く）
+// ============================================================
 function addJpCard(jpText, srcText, lagSec) {
-  const bottom = document.getElementById('split-bottom');
-  const ph     = document.getElementById('jp-ph');
+  var bottom = document.getElementById('split-bottom');
+  var ph     = document.getElementById('jp-ph');
   if (ph) ph.remove();
 
-  // 過去カードを薄くする（最新でなくなった）
-  document.querySelectorAll('.jp-card').forEach(c => {
-    c.style.borderColor = '#4dabf733';
-    c.style.boxShadow   = 'none';
+  // 既存カードから latest クラスを外す
+  document.querySelectorAll('.jp-card.latest').forEach(function(c) {
+    c.classList.remove('latest');
   });
 
-  const card = document.createElement('div');
-  card.className = 'jp-card';
-  card.style.borderColor = HL_LATEST_BORDER;
-  card.style.boxShadow   = `0 0 10px ${HL_LATEST_BORDER}44`;
+  var card = document.createElement('div');
+  card.className = 'jp-card latest';
 
-  const t = new Date().toLocaleTimeString('ja-JP');
-  card.innerHTML = `
-    <div class="jp-meta">
-      <span style="color:${HL_LATEST_BORDER};opacity:.85">🕐 ${t} &nbsp;#${jpCount}</span>
-      <span class="jp-lag" style="border-color:${HL_LATEST_BORDER}66;color:${HL_LATEST_BORDER}">⏱ ${lagSec}s</span>
-    </div>
-    <div class="jp-text">${esc(jpText).replace(/\n/g,'<br>')}</div>
-    ${srcText ? `<div class="jp-src">${esc(srcText.slice(0,110))}${srcText.length>110?'…':''}</div>` : ''}
-  `;
+  var t = new Date().toLocaleTimeString('ja-JP');
+  var srcHtml = srcText
+    ? '<div class="jp-src">' + esc(srcText.slice(0,110)) + (srcText.length>110?'…':'') + '</div>'
+    : '';
+  card.innerHTML =
+    '<div class="jp-meta">'
+    + '<span>🕐 ' + t + ' &nbsp;#' + jpCount + '</span>'
+    + '<span class="jp-lag">⏱ ' + lagSec + 's</span>'
+    + '</div>'
+    + '<div class="jp-text">' + esc(jpText).replace(/\n/g,'<br>') + '</div>'
+    + srcHtml;
+
   bottom.appendChild(card);
-  requestAnimationFrame(() => { bottom.scrollTop = bottom.scrollHeight; });
+  requestAnimationFrame(function() { bottom.scrollTop = bottom.scrollHeight; });
 }
 
 // ============================================================
-// 共通 Claude API リクエスト（iOS fetch 対策）
+// Claude API リクエスト（iOS AbortController 対策）
 // ============================================================
-async function claudeRequest(body, timeoutMs = 30000) {
-  // AbortSignal.timeout が使えない古い Safari 向けに手動タイムアウト
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'x-api-key':     getKey(),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body:   JSON.stringify(body),
-      signal: controller.signal,
-    });
+function claudeRequest(body, timeoutMs) {
+  var controller = new AbortController();
+  var tid = setTimeout(function() { controller.abort(); }, timeoutMs || 30000);
+
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'x-api-key':     getKey(),
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body:   JSON.stringify(body),
+    signal: controller.signal
+  })
+  .then(function(res) {
     clearTimeout(tid);
     if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`Claude API ${res.status}: ${txt.slice(0,120)}`);
+      return res.text().catch(function(){return '';}).then(function(txt) {
+        throw new Error('Claude API ' + res.status + ': ' + txt.slice(0,120));
+      });
     }
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    return data;
-  } catch(e) {
+    return res.json().then(function(data) {
+      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+      return data;
+    });
+  })
+  .catch(function(e) {
     clearTimeout(tid);
-    // iOS Safari の "Load failed" を人間が読めるエラーに変換
     if (e.message === 'Load failed' || e.message === 'Failed to fetch') {
       throw new Error('通信エラー（APIキーまたはネットワークを確認してください）');
     }
     throw e;
-  }
+  });
 }
 
 // ============================================================
-// 要約タイマー（90 秒間隔）
+// 要約タイマー
 // ============================================================
-function _updateCd() {
-  const el = document.getElementById('sum-cd');
+function updateSumCd() {
+  var el = document.getElementById('sum-cd');
   if (!el) return;
   if (!isOn || !summaryNextAt) { el.textContent = ''; return; }
-  const rem = Math.max(0, Math.ceil((summaryNextAt - Date.now()) / 1000));
-  el.textContent = `次の要約まで ${Math.floor(rem/60)}:${String(rem%60).padStart(2,'0')}`;
+  var rem = Math.max(0, Math.ceil((summaryNextAt - Date.now()) / 1000));
+  el.textContent = '次の要約まで ' + Math.floor(rem/60) + ':' + String(rem%60).padStart(2,'0');
 }
 function startSummaryTimer() {
   stopSummaryTimer();
-  summaryNextAt  = Date.now() + SUMMARY_INTERVAL;
-  summaryTimerId = setTimeout(async function tick() {
-    await generateSummary(false);
-    if (isOn) { summaryNextAt = Date.now() + SUMMARY_INTERVAL; summaryTimerId = setTimeout(tick, SUMMARY_INTERVAL); }
-  }, SUMMARY_INTERVAL);
-  sumCdId = setInterval(_updateCd, 1000);
-  _updateCd();
+  summaryNextAt = Date.now() + SUMMARY_INTERVAL_MS;
+  (function tick() {
+    summaryTimer = setTimeout(function() {
+      generateSummary(false).then(function() {
+        if (isOn) {
+          summaryNextAt = Date.now() + SUMMARY_INTERVAL_MS;
+          tick();
+        }
+      });
+    }, SUMMARY_INTERVAL_MS);
+  })();
+  sumCdTimer = setInterval(updateSumCd, 1000);
+  updateSumCd();
 }
 function stopSummaryTimer() {
-  clearTimeout(summaryTimerId); clearInterval(sumCdId);
-  summaryTimerId = sumCdId = null; summaryNextAt = 0; _updateCd();
+  clearTimeout(summaryTimer);
+  clearInterval(sumCdTimer);
+  summaryTimer = sumCdTimer = null;
+  summaryNextAt = 0;
+  updateSumCd();
 }
 
 // ============================================================
 // 要約生成
 // ============================================================
-async function generateSummary(manual = false) {
-  if (summaryBusy) { if (manual) showErr('⚠️ 分析中です'); return; }
-  const newWords   = fullText.slice(summaryPos).trim().split(/\s+/).filter(Boolean).length;
-  const totalWords = fullText.trim().split(/\s+/).filter(Boolean).length;
+function generateSummary(manual) {
+  if (summaryBusy) { if (manual) showErr('⚠️ 分析中です'); return Promise.resolve(); }
+  var newWords   = fullText.slice(summaryPos).trim().split(/\s+/).filter(Boolean).length;
+  var totalWords = fullText.trim().split(/\s+/).filter(Boolean).length;
   if (newWords < SUMMARY_MIN_WORDS) {
-    if (manual) showErr(`⚠️ テキスト不足（+${newWords}語 / 最低${SUMMARY_MIN_WORDS}語必要）`);
-    return;
+    if (manual) showErr('⚠️ テキスト不足（+' + newWords + '語 / 最低' + SUMMARY_MIN_WORDS + '語必要）');
+    return Promise.resolve();
   }
-  if (!getKey()) { showErr('⚠️ Claude API Keyを設定してください'); return; }
+  if (!getKey()) { showErr('⚠️ Claude API Keyを設定してください'); return Promise.resolve(); }
 
-  summaryBusy = true; summaryCount++;
-  const capturedPos = fullText.length;
-  const now     = new Date();
-  const timeStr = now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
-  const pane    = document.getElementById('tab-summary');
-  const ph      = document.getElementById('sum-ph');
+  summaryBusy = true;
+  summaryCount++;
+  var capturedPos = fullText.length;
+  var now     = new Date();
+  var timeStr = now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  var pane    = document.getElementById('tab-summary');
+  var ph      = document.getElementById('sum-ph');
 
-  pane.querySelectorAll('.smr-card').forEach(c => { c.style.opacity = '0.3'; });
+  pane.querySelectorAll('.smr-card').forEach(function(c){ c.style.opacity='0.3'; });
   if (ph) ph.remove();
 
-  const card = document.createElement('div');
+  var card = document.createElement('div');
   card.className = 'smr-card loading';
-  card.innerHTML = `
-    <div class="smr-meta"><span>${timeStr} 更新${summaryCount}回目</span>
-    <span class="smr-meta-label">🧠 全文${totalWords}語 解析中…</span></div>
-    <div class="smr-body" style="font-size:12px;color:var(--muted);padding:8px 0">全体像を解析しています…</div>`;
+  card.innerHTML =
+    '<div class="smr-meta"><span>' + timeStr + ' 更新' + summaryCount + '回目</span>'
+    + '<span class="smr-meta-label">🧠 全文' + totalWords + '語 解析中…</span></div>'
+    + '<div class="smr-body" style="font-size:12px;color:var(--muted);padding:8px 0">全体像を解析しています…</div>';
 
-  const hdr = document.getElementById('sum-hdr');
+  var hdr = document.getElementById('sum-hdr');
   if (hdr && hdr.nextSibling) pane.insertBefore(card, hdr.nextSibling);
   else pane.appendChild(card);
 
-  try {
-    const ctx = getCtx();
-    const data = await claudeRequest({
-      model:      'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
-      system:
-`同時通訳補助AI。英語スピーチ全文を精読し、全体像・論点・構造を日本語で整理。
+  var ctx = getCtx();
+  var userMsg = (ctx ? '【背景】' + ctx + '\n\n' : '')
+              + '【全文 ' + totalWords + '語】\n' + fullText.trim();
 
-【出力フォーマット】
-▌ 概要
-（3〜4文で主旨）
-
-## 主な論点・主張
-• 5〜8点（各1〜2文）
-
-## 話の流れ
-• 冒頭 → 中盤 → 現時点の着地点
-
-## キーワード
-（重要用語を「/」区切り）
-
-前置き不要。上記フォーマットのみ出力。`,
-      messages: [{ role:'user', content:
-        [ctx ? `【背景】${ctx}\n\n` : '',
-         `【全文 ${totalWords}語】\n${fullText.trim()}`].join('') }],
-    }, 90000);
-
-    const summary = data?.content?.[0]?.text?.trim() || '';
+  return claudeRequest({
+    model:      'claude-haiku-4-5-20251001',
+    max_tokens: 2048,
+    system: '同時通訳補助AI。英語スピーチ全文を精読し、全体像・論点・構造を日本語で整理。\n\n【出力フォーマット】\n▌ 概要\n（3〜4文で主旨）\n\n## 主な論点・主張\n• 5〜8点（各1〜2文）\n\n## 話の流れ\n• 冒頭 → 中盤 → 現時点の着地点\n\n## キーワード\n（重要用語を「/」区切り）\n\n前置き不要。上記フォーマットのみ出力。',
+    messages: [{ role: 'user', content: userMsg }]
+  }, 90000)
+  .then(function(data) {
+    var summary = data && data.content && data.content[0] ? data.content[0].text.trim() : '';
     if (!summary) throw new Error('要約結果が空です');
-
     summaryPos = capturedPos;
-    pane.querySelectorAll('.smr-card').forEach(c => { if (c !== card) c.remove(); });
+    pane.querySelectorAll('.smr-card').forEach(function(c){ if(c!==card) c.remove(); });
     card.classList.remove('loading');
-    card.querySelector('.smr-meta .smr-meta-label').textContent = `🧠 全文${totalWords}語`;
-    card.querySelector('.smr-body').outerHTML = `<div>${parseSummary(summary)}</div>`;
+    card.querySelector('.smr-meta .smr-meta-label').textContent = '🧠 全文' + totalWords + '語';
+    card.querySelector('.smr-body').outerHTML = '<div>' + parseSummary(summary) + '</div>';
     pane.scrollTop = 0;
-
-  } catch(e) {
+  })
+  .catch(function(e) {
     card.classList.add('error');
     card.querySelector('.smr-body').innerHTML =
-      `<span style="color:var(--red);font-size:12px">⚠️ ${esc(e.message)}</span>`;
+      '<span style="color:var(--red);font-size:12px">⚠️ ' + esc(e.message) + '</span>';
     summaryCount--;
     console.error('[summary]', e);
-  } finally { summaryBusy = false; }
+  })
+  .finally(function() { summaryBusy = false; });
 }
 
 function parseSummary(text) {
-  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l);
-  let html='', bullets=[], sec='', inOv=false;
+  var lines = text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
+  var html='', bullets=[], sec='', inOv=false;
   function flush() {
     if (!bullets.length) return;
-    if (sec) html += `<div class="smr-section-title">${esc(sec)}</div>`;
-    html += `<ul class="smr-points">${bullets.map(b=>`<li class="smr-point">${esc(b)}</li>`).join('')}</ul>`;
+    if (sec) html += '<div class="smr-section-title">' + esc(sec) + '</div>';
+    html += '<ul class="smr-points">' + bullets.map(function(b){
+      return '<li class="smr-point">' + esc(b) + '</li>';
+    }).join('') + '</ul>';
     bullets=[]; sec='';
   }
-  for (const l of lines) {
-    if (/^▌/.test(l)) { inOv=true; const r=l.replace(/^▌\s*(概要)?\s*/i,'').trim(); if(r) html+=`<div class="smr-overview">${esc(r)}`; continue; }
-    if (/^##/.test(l)) { if(inOv){html+='</div>';inOv=false;} flush(); sec=l.replace(/^#+\s*/,'').trim(); continue; }
-    if (/^[•・\-]/.test(l)||/^\d+[\.\)]/.test(l)) { if(inOv){html+='</div>';inOv=false;} bullets.push(l.replace(/^[\s•・\-\d\.\)]+/,'').trim()); continue; }
-    if (/^(キーワード|Keywords)/i.test(l)) { if(inOv){html+='</div>';inOv=false;} flush(); html+=`<div class="smr-section-title">キーワード</div><div class="smr-keywords">${esc(l.replace(/^[^:：]*[：:]\s*/,'').trim())}</div>`; continue; }
+  for (var i=0; i<lines.length; i++) {
+    var l = lines[i];
+    if (/^▌/.test(l)) {
+      inOv=true;
+      var r=l.replace(/^▌\s*(概要)?\s*/i,'').trim();
+      if(r) html+='<div class="smr-overview">'+esc(r);
+      continue;
+    }
+    if (/^##/.test(l)) {
+      if(inOv){html+='</div>';inOv=false;}
+      flush(); sec=l.replace(/^#+\s*/,'').trim(); continue;
+    }
+    if (/^[•・\-]/.test(l)||/^\d+[\.\)]/.test(l)) {
+      if(inOv){html+='</div>';inOv=false;}
+      bullets.push(l.replace(/^[\s•・\-\d\.\)]+/,'').trim()); continue;
+    }
+    if (/^(キーワード|Keywords)/i.test(l)) {
+      if(inOv){html+='</div>';inOv=false;}
+      flush();
+      html+='<div class="smr-section-title">キーワード</div>'
+           +'<div class="smr-keywords">'+esc(l.replace(/^[^:：]*[：:]\s*/,'').trim())+'</div>';
+      continue;
+    }
     if (inOv) { html+='<br>'+esc(l); continue; }
-    html+=`<p style="font-size:12px;color:var(--muted);margin:3px 0;line-height:1.6">${esc(l)}</p>`;
+    html+='<p style="font-size:12px;color:var(--muted);margin:3px 0;line-height:1.6">'+esc(l)+'</p>';
   }
-  if (inOv) html+='</div>'; flush();
+  if (inOv) html+='</div>';
+  flush();
   return html;
 }
 
 // ============================================================
 // 未翻訳フラッシュ（保存前）
 // ============================================================
-async function flushTranslations() {
-  for (let i=0; i<60&&translating; i++) await sleep(300);
-  for (let loop=0; loop<8; loop++) {
-    while (translating) await sleep(200);
-    const rem = fullText.slice(readPos).trim();
-    if (rem.split(/\s+/).filter(Boolean).length < 2) break;
-    lastTranslated = 0;
-    await doTranslate();
+function sleep(ms) { return new Promise(function(r){setTimeout(r,ms);}); }
+
+function flushTranslations() {
+  var loops = 0;
+  function next() {
+    if (loops++ >= 8) return Promise.resolve();
+    return new Promise(function(resolve) {
+      function wait() {
+        if (translating) { setTimeout(wait, 200); return; }
+        var rem = fullText.slice(readPos).trim();
+        if (rem.split(/\s+/).filter(Boolean).length < 2) { resolve(); return; }
+        lastTransAt = 0;
+        doTranslate();
+        setTimeout(function() { next().then(resolve); }, 2000);
+      }
+      wait();
+    });
   }
+  return next();
 }
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ============================================================
 // セッション保存
 // ============================================================
-async function saveSession() {
+function saveSession() {
   if (isOn) stopListening();
-
-  const wc = fullText.trim().split(/\s+/).filter(Boolean).length;
+  var wc = fullText.trim().split(/\s+/).filter(Boolean).length;
   if (wc < 10) { showErr('⚠️ テキストが少なすぎます'); return; }
   if (!getKey()) { showErr('⚠️ Claude API Keyを設定してください'); return; }
 
   showSaveStatus('🔄 未翻訳テキストを翻訳中…');
-  await flushTranslations();
+  flushTranslations().then(function() {
+    var now   = new Date();
+    var stamp = now.toISOString().slice(0,16).replace('T','_').replace(':','-');
+    var ctx   = getCtx();
 
-  const now   = new Date();
-  const stamp = now.toISOString().slice(0,16).replace('T','_').replace(':','-');
-  const ctx   = getCtx();
+    var transcript = [
+      '# Live Interpreter — English Transcript',
+      'Date   : ' + now.toLocaleString('ja-JP'),
+      'Words  : ' + wc,
+      ctx ? 'Context: ' + ctx : null,
+      '', '---', '', fullText.trim()
+    ].filter(function(l){return l!==null;}).join('\n');
 
-  // ── ① 英文文字起こし ──
-  const transcript = [
-    '# Live Interpreter — English Transcript',
-    `Date   : ${now.toLocaleString('ja-JP')}`,
-    `Words  : ${wc}`,
-    ctx ? `Context: ${ctx}` : null,
-    '','---','', fullText.trim(),
-  ].filter(l=>l!==null).join('\n');
+    saveFile(transcript, 'transcript_' + stamp + '.txt');
+    showSaveStatus('🤖 レポートをClaudeで生成中…');
 
-  saveFile(transcript, `transcript_${stamp}.txt`);
+    var userMsg = ['日時: '+now.toLocaleString('ja-JP'), '語数: '+wc+'語',
+                   ctx?'背景: '+ctx:null, '', '【英語スピーチ全文】', fullText.trim()]
+                  .filter(Boolean).join('\n');
 
-  // ── ② Claude 構造化レポート ──
-  showSaveStatus('🤖 レポートをClaudeで生成中…');
-  try {
-    const data = await claudeRequest({
+    return claudeRequest({
       model:      'claude-haiku-4-5-20251001',
       max_tokens: 3000,
-      system:
-`会議・講演の議事録作成専門家。英語スピーチ全文を分析し構造化された日本語レポートをMarkdown形式で作成。
-
-# 📋 スピーチ要約レポート
-
-## 基本情報
-## エグゼクティブサマリー
-## 主要な内容・論点
-## 話の構成・流れ
-## キーワード・専門用語
-## アクションアイテム（なければ省略）
-
-前置き不要。完全な日本語で。`,
-      messages: [{ role:'user', content:
-        [`日時: ${now.toLocaleString('ja-JP')}`, `語数: ${wc}語`,
-         ctx?`背景: ${ctx}`:null, '', '【英語スピーチ全文】', fullText.trim()]
-        .filter(Boolean).join('\n') }],
-    }, 90000);
-
-    const report = data?.content?.[0]?.text?.trim() || '';
-    saveFile(report, `report_${stamp}.md`);
-    showSaveStatus('✅ 保存完了！ 2つのファイルをダウンロードしました', true, 7000);
-
-  } catch(e) {
-    console.error('[save-report]', e);
-    showErr('⚠️ レポート生成エラー: ' + e.message);
-    showSaveModal('レポート生成に失敗しました。英文文字起こしはダウンロード済みです。\n\nエラー: ' + e.message,
-                  `report_${stamp}.md`);
-    showSaveStatus('⚠️ レポート生成失敗（文字起こしは保存済み）', true, 8000);
-  }
+      system: '会議・講演の議事録作成専門家。英語スピーチ全文を分析し構造化された日本語レポートをMarkdown形式で作成。\n\n# 📋 スピーチ要約レポート\n\n## 基本情報\n## エグゼクティブサマリー\n## 主要な内容・論点\n## 話の構成・流れ\n## キーワード・専門用語\n## アクションアイテム（なければ省略）\n\n前置き不要。完全な日本語で。',
+      messages: [{ role: 'user', content: userMsg }]
+    }, 90000)
+    .then(function(data) {
+      var report = data && data.content && data.content[0] ? data.content[0].text.trim() : '';
+      saveFile(report, 'report_' + stamp + '.md');
+      showSaveStatus('✅ 保存完了！ 2つのファイルをダウンロードしました', true, 7000);
+    })
+    .catch(function(e) {
+      console.error('[save-report]', e);
+      showErr('⚠️ レポート生成エラー: ' + e.message);
+      showSaveModal('レポート生成に失敗しました。\n\nエラー: ' + e.message,
+                    'report_' + stamp + '.md');
+      showSaveStatus('⚠️ レポート生成失敗（文字起こしは保存済み）', true, 8000);
+    });
+  });
 }
 
-// ファイル保存（iOS対応: Web Share API → blob download の順で試行）
-async function saveFile(content, filename) {
-  const blob = new Blob([content], { type:'text/plain;charset=utf-8' });
-
-  // ① Web Share API（iOS ネイティブ共有シートが開く）
+function saveFile(content, filename) {
+  var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   if (navigator.share && navigator.canShare &&
       navigator.canShare({ files:[new File([blob], filename, {type:'text/plain'})] })) {
-    try {
-      await navigator.share({
-        files: [new File([blob], filename, { type:'text/plain' })],
-        title: filename,
-      });
-      return;
-    } catch(e) {
-      if (e.name === 'AbortError') return; // ユーザーがキャンセル
-    }
+    navigator.share({
+      files: [new File([blob], filename, {type:'text/plain'})],
+      title: filename
+    }).catch(function(e){ if(e.name!=='AbortError') saveFileBlob(blob, filename, content); });
+    return;
   }
-
-  // ② 通常の <a download>（desktop Chrome 等）
+  saveFileBlob(blob, filename, content);
+}
+function saveFileBlob(blob, filename, content) {
   try {
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
+    var url = URL.createObjectURL(blob);
+    var a   = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    return;
-  } catch(e) { /* フォールバックへ */ }
-
-  // ③ モーダル表示（上記が両方失敗した場合）
-  showSaveModal(content, filename);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  } catch(e) {
+    showSaveModal(content, filename);
+  }
 }
-
-// ── 保存モーダル（コピー用フォールバック）──
 function showSaveModal(content, filename) {
   modalContent = content; modalFilename = filename;
   document.getElementById('save-modal-text').value = content;
@@ -1005,21 +984,19 @@ function showSaveModal(content, filename) {
 function closeSaveModal() {
   document.getElementById('save-modal').classList.remove('open');
 }
-async function shareModalContent() {
+function shareModalContent() {
   if (navigator.share) {
-    try {
-      await navigator.share({ title: modalFilename, text: modalContent });
-      closeSaveModal(); return;
-    } catch(e) {}
+    navigator.share({ title: modalFilename, text: modalContent })
+      .then(function(){ closeSaveModal(); })
+      .catch(function(){copyModal();});
+  } else {
+    copyModal();
   }
-  // クリップボードにコピー
-  try {
-    await navigator.clipboard.writeText(modalContent);
-    showErr('📋 クリップボードにコピーしました');
-    closeSaveModal();
-  } catch(e) {
-    showErr('⚠️ コピーに失敗しました。テキストを手動で選択してコピーしてください。');
-  }
+}
+function copyModal() {
+  navigator.clipboard.writeText(modalContent)
+    .then(function(){ showErr('📋 クリップボードにコピーしました'); closeSaveModal(); })
+    .catch(function(){ showErr('⚠️ コピーに失敗しました。テキストを手動で選択してコピーしてください。'); });
 }
 
 // ============================================================
@@ -1027,36 +1004,35 @@ async function shareModalContent() {
 // ============================================================
 function clearAll() {
   if (isOn) stopListening();
-  fullText=''; readPos=0; jpCount=0; startTime=null; recentJpTrans=[];
-  batchArrivalTime=0; lastFinalArrival=0; lagHistory=[];
-  translatedSegments=[]; currentInterim='';
+  fullText=''; readPos=0; jpCount=0; startTime=null; recentJp=[];
+  speechStartAt=0; lagHistory=[]; segments=[]; lastInterim='';
   summaryPos=0; summaryCount=0; summaryBusy=false;
   clearInterval(elapsedLoop); stopSummaryTimer();
 
-  const committed = document.getElementById('transcript-committed');
-  committed.textContent = '（英語音声をここに表示）';
-  committed.style.color = '#555';
-  document.getElementById('transcript-interim').textContent   = '';
+  document.getElementById('transcript-committed').innerHTML = '';
+  document.getElementById('transcript-committed').style.color = '#555';
+  document.getElementById('transcript-committed').textContent = '（英語音声をここに表示）';
+  document.getElementById('transcript-interim').textContent = '';
   document.getElementById('s-words').textContent = '0';
   document.getElementById('s-trans').textContent = '0';
   document.getElementById('s-lag').textContent   = '--';
   document.getElementById('s-el').textContent    = '00:00';
 
   document.getElementById('split-bottom').innerHTML =
-    '<div id="jp-ph" style="color:var(--muted);font-size:12px;text-align:center;padding:32px 0;line-height:1.8">' +
-    '翻訳結果がここに表示されます<br>' +
-    '<span style="font-size:10px;opacity:.5">録音開始後、数秒で最初の翻訳が届きます</span></div>';
+    '<div id="jp-ph" style="color:var(--muted);font-size:12px;text-align:center;padding:32px 0;line-height:1.8">'
+    + '翻訳結果がここに表示されます<br>'
+    + '<span style="font-size:10px;opacity:.5">録音開始後、数秒で最初の翻訳が届きます</span></div>';
 
   document.getElementById('tab-summary').innerHTML =
-    '<div id="sum-hdr" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-    '<span id="sum-cd" style="font-size:11px;color:var(--muted)"></span>' +
-    '<button class="btn d" style="padding:5px 12px;font-size:11px;border-radius:10px" onclick="generateSummary(true)">📝 今すぐ</button>' +
-    '</div>' +
-    '<div id="sum-ph" style="color:var(--muted);font-size:12px;text-align:center;padding:40px 0;line-height:1.8">' +
-    '録音開始後、<b style="color:var(--accent)">1分30秒ごと</b>に<br>英語全文を解析して全体像をまとめます</div>';
+    '<div id="sum-hdr" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    + '<span id="sum-cd" style="font-size:11px;color:var(--muted)"></span>'
+    + '<button class="btn d" style="padding:5px 12px;font-size:11px;border-radius:10px" onclick="generateSummary(true)">📝 今すぐ</button>'
+    + '</div>'
+    + '<div id="sum-ph" style="color:var(--muted);font-size:12px;text-align:center;padding:40px 0;line-height:1.8">'
+    + '録音開始後、<b style="color:var(--accent)">1分30秒ごと</b>に<br>英語全文を解析して全体像をまとめます</div>';
 
   document.getElementById('save-status').style.display = 'none';
-  _updateBtns(false);
+  updateBtns(false);
   setBadge('b-mic','🎙 OFF','boff');
   setBadge('b-ai','🤖 待機','boff');
 }
