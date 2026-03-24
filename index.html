@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.25</title>
+  <title>🎙️ Live Interpreter v2.26</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.25 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.26 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.25 「確定訳は不変」アーキテクチャ
+// v2.26 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -276,6 +276,8 @@ var lastTransAt   = 0;
 var speechStartAt = 0;  // 現バッチ最初のGroqチャンク録音開始時刻（翻訳完了後リセット）
 var lagHistory    = [];
 var transCount    = 0;
+var enHighlightTimer = null; // 英語ハイライト遅延タイマー（前のタイマーをキャンセルするため管理）
+var jpHasContent  = false;   // 一度でも翻訳結果が表示されたかフラグ（プレースホルダー表示制御）
 
 var recognition   = null;
 var meterAnim     = null;
@@ -399,17 +401,20 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.25）────────
+// ─── 日本語テキストレンダリング（v2.26）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
 function renderJpDisplay(stable, typing) {
   var el=document.getElementById('jp-display');
-  if(!stable && !typing) {
+  // プレースホルダーはセッション中に一度も翻訳がなく、タイプライターも動いていない場合のみ表示
+  // （revTailトリムでstableが一時的に空になっても消えないようにするため）
+  if(!stable && !typing && !jpHasContent && !isTyping && pendingJpQueue.length===0) {
     el.innerHTML='<span id="jp-ph">翻訳結果がここに表示されます<br>'
       +'<span style="font-size:10px;opacity:.5">音声に合わせてリアルタイム翻訳を表示</span></span>';
     return;
   }
+  if(!stable && !typing) return; // 内容なし・翻訳中 → 表示を変えずそのまま保持
   var html='';
   // older stable（確定済み・薄青）/ latest stable（最新確定・紫ハイライト）/ typing（タイプライター中）
   var olderJp  = stable ? stable.slice(0, latestJpStart) : '';
@@ -424,7 +429,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.25）─────────────────────
+// ─── タイプライター表示キュー（v2.26）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, revTail, batchStart) {
@@ -441,6 +446,11 @@ function startNextTypewriter() {
     return;
   }
   isTyping=true;
+  jpHasContent=true; // 翻訳コンテンツあり → プレースホルダー非表示
+  // 前の400msハイライトタイマーを必ずキャンセル（レースコンディション防止）
+  clearTimeout(enHighlightTimer);
+  enHighlightTimer=null;
+
   var item=pendingJpQueue.shift();
   var text=item.text;
 
@@ -449,7 +459,7 @@ function startNextTypewriter() {
     stableJp=stableJp.slice(0, stableJp.length-item.revTail.length);
   }
 
-  // ② 旧ハイライトを先に消す（JP: 薄青へ、EN: 翻訳済み全体をグレーへ）
+  // ② 旧ハイライトを先に消す（JP: 薄青へ、EN: 全ハイライト消去）
   latestJpStart=stableJp.length;
   latestEnStart=999999999;     // 全ての英語ハイライトを消す（番兵値）
   renderJpDisplay(stableJp,'');
@@ -465,7 +475,9 @@ function startNextTypewriter() {
   }
 
   // ④ 400ms後: 今バッチの英語を紫ハイライト（旧が消えてから新が現れる — 視覚的に明確に分離）
-  setTimeout(function() {
+  // enHighlightTimer で管理し、次のstartNextTypewriter開始時に必ずキャンセルする
+  enHighlightTimer=setTimeout(function() {
+    enHighlightTimer=null;
     latestEnStart=item.enStart;
     renderTranscript('');
   }, 400);
@@ -866,7 +878,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.25 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.26 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -1195,6 +1207,7 @@ function clearAll() {
   fullText=''; lastSnapPos=0; latestEnStart=0;
   stableJp=''; latestJpStart=0; recentJpCtx='';
   pendingJpQueue=[]; isTyping=false; clearTimeout(typingTimer);
+  clearTimeout(enHighlightTimer); enHighlightTimer=null; jpHasContent=false;
   translating=false; lastTransAt=0; speechStartAt=0; lastSpeechAt=0;
   lagHistory=[]; transCount=0; startTime=null; isForcedStop=false;
   // Groq状態リセット
