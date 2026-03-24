@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.4</title>
+  <title>🎙️ Live Interpreter v2.5</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -75,7 +75,7 @@
     #transcript-committed { font-size:13px; line-height:1.9; word-break:break-word; }
     #transcript-interim   { font-size:13px; line-height:1.9; color:var(--yellow);
                              word-break:break-word; opacity:.8; }
-    .hl-committed { color:#aaa; }
+    .hl-committed { color:#ddd; }
     .hl-active    { background:rgba(204,93,232,0.18); border-bottom:2px solid #cc5de8;
                     border-radius:2px; padding:0 1px; color:#ccc; }
     #jp-display {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.4 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.5 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -242,12 +242,13 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.4 翻訳状態
+// v2.5 翻訳状態
 var activeStart   = 0;      // アクティブ翻訳ウィンドウの英語開始位置
 var lastSnapPos   = 0;      // 最後の翻訳時点での fullText 長
 var stableJp      = '';     // 完全確定済み日本語（下線なし）
 var activeJp      = '';     // 現在のアクティブ翻訳（差分のみ下線）
 var prevActiveJp  = '';     // 一つ前のアクティブ翻訳（差分計算用）
+var isCommitted   = false;  // コミット済みフラグ（次の翻訳が来るまで下線を保持）
 var recentJpCtx   = '';     // 翻訳文脈用の直近JP
 var isForcedStop  = false;  // CHUNK_MAX 強制停止フラグ
 
@@ -403,17 +404,17 @@ function renderJapanese() {
   requestAnimationFrame(function(){ bottom.scrollTop=bottom.scrollHeight; });
 }
 
-// ─── コミット：activeJp を確定済みに昇格 ────
-// activeJp を stableJp に追加して確定。activeStart は lastSnapPos に進める（引き戻しなし）
-// → 重複表示バグの根本原因だった「retroactive pullback」を廃止
-// 翻訳の自然さはプロンプトの recentJpCtx（直近確定訳）で維持
+// ─── コミット：activeJp を「コミット済み」に昇格 ────
+// activeJp は消さずに残す（下線を保持）→ 次の翻訳が来たときに stableJp へ移動
+// isCommitted フラグで「次の翻訳時にstableへ移す」ことを伝える
+// prevActiveJp = '' にすることで次の翻訳は新ブロック扱い（全体下線）
 function commitActiveTranslation() {
   if(!activeJp) return;
-  stableJp     += activeJp;
-  recentJpCtx   = stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
-  activeJp      = '';
-  prevActiveJp  = '';  // 次のブロック開始時は差分なし（全体下線）
-  activeStart   = lastSnapPos;  // 翻訳済み位置まで進める（重複なし）
+  // stableJp には移動せず、activeJp はそのまま（下線表示を維持）
+  recentJpCtx  = (stableJp+activeJp).split(/[。！？]/).filter(Boolean).slice(-6).join('。');
+  isCommitted  = true;   // 次の翻訳到着時に stableJp へ移動
+  prevActiveJp = '';     // 次は新ブロック → 全体下線
+  activeStart  = lastSnapPos;
 
   renderJapanese();
   var lb=document.getElementById('jp-lag-badge');
@@ -579,7 +580,14 @@ function doTranslate() {
     var lagSec=((Date.now()-batchStart)/1000).toFixed(1);
     recordLag(parseFloat(lagSec));
     lastSnapPos=snapshot;
-    prevActiveJp=activeJp;  // 差分計算のために前回訳を保存
+    if(isCommitted) {
+      // コミット済みの activeJp を stableJp へ移動（下線なし領域へ）
+      stableJp+=activeJp;
+      isCommitted=false;
+      // prevActiveJp は '' のまま（新ブロック → 全体下線）
+    } else {
+      prevActiveJp=activeJp; // 同一ブロック内の差分計算用
+    }
     activeJp=jp;
     speechStartAt=0;
     transCount++;
@@ -787,7 +795,7 @@ function copyModal(){
 function clearAll() {
   if(isOn) stopListening();
   fullText=''; activeStart=0; lastSnapPos=0;
-  stableJp=''; activeJp=''; recentJpCtx='';
+  stableJp=''; activeJp=''; prevActiveJp=''; isCommitted=false; recentJpCtx='';
   translating=false; lastTransAt=0; speechStartAt=0; lastSpeechAt=0;
   lagHistory=[]; transCount=0; startTime=null; isForcedStop=false;
   summaryPos=0; summaryCount=0; summaryBusy=false;
