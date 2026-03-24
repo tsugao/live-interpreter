@@ -83,7 +83,10 @@
       word-break:break-word; overflow-wrap:break-word;
     }
     .jp-stable  { color:#c8e8ff; }
-    .jp-typing  { color:#e8f8ff; } /* タイプライター中の文字 */
+    .jp-latest  { background:rgba(204,93,232,0.18); border-bottom:2px solid #cc5de8;
+                  border-radius:2px; padding:0 1px; color:#e8d0ff; } /* 最新確定訳：英語と同じ紫ハイライト */
+    .jp-typing  { background:rgba(204,93,232,0.18); border-bottom:2px solid #cc5de8;
+                  border-radius:2px; padding:0 1px; color:#e8d0ff; } /* タイプライター中も紫ハイライト */
     .jp-cursor  {
       display:inline-block; color:var(--purple); margin-left:1px;
       animation:jp-blink .65s step-end infinite;
@@ -249,6 +252,7 @@ var fullText     = '';
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var stableJp      = '';     // 確定済み日本語（一切変更しない）
+var latestJpStart = 0;      // stableJp内の「最新バッチ開始位置」（紫ハイライト用）
 var recentJpCtx   = '';     // 直近確定訳（翻訳プロンプトの文脈用・最後6文程度）
 var isForcedStop  = false;  // CHUNK_MAX 強制停止フラグ（Web Speech APIモード用）
 var lastInterim   = '';     // iOSのinterim救済用（Web Speech APIモード）
@@ -299,7 +303,9 @@ var MIN_WAIT_MS     = 5000;   // 翻訳間隔の最小値（5秒）
 var FORCE_MS        = 20000;  // 強制翻訳タイムアウト（20秒）
 var MIN_WORDS       = 20;     // 翻訳開始の最小新規語数
 var CTX_WORDS       = 200;    // 翻訳プロンプトへ送る英語コンテキスト語数
-var GROQ_CHUNK_MS   = 7000;   // Groqモード: 1チャンクの録音時間(ms)
+var GROQ_CHUNK_MS        = 7000;  // Groqモード: 1チャンクの録音時間(ms)
+var GROQ_FIRST_CHUNK_MS  = 3500;  // Groqモード: 初回チャンクは短くして最初の文字起こしを早める
+var isFirstChunk         = true;  // 初回チャンクフラグ
 var TYPEWRITER_MS   = 28;     // タイプライター: 通常速度(ms/文字)
 var TYPEWRITER_FAST_MS = 12;  // タイプライター: キュー溜まり時の高速表示(ms/文字)
 var SUMMARY_MS  = 90000;
@@ -405,8 +411,12 @@ function renderJpDisplay(stable, typing) {
     return;
   }
   var html='';
-  if(stable) html+='<span class="jp-stable">'+esc(stable).replace(/\n/g,'<br>')+'</span>';
-  if(typing) html+='<span class="jp-typing">'+esc(typing).replace(/\n/g,'<br>')
+  // older stable（確定済み・薄青）/ latest stable（最新確定・紫ハイライト）/ typing（タイプライター中）
+  var olderJp  = stable ? stable.slice(0, latestJpStart) : '';
+  var latestJp = stable ? stable.slice(latestJpStart)    : '';
+  if(olderJp)  html+='<span class="jp-stable">'+esc(olderJp).replace(/\n/g,'<br>')+'</span>';
+  if(latestJp) html+='<span class="jp-latest">'+esc(latestJp).replace(/\n/g,'<br>')+'</span>';
+  if(typing)   html+='<span class="jp-typing">'+esc(typing).replace(/\n/g,'<br>')
     +'<span class="jp-cursor">|</span></span>';
   el.innerHTML=html;
   var bottom=document.getElementById('split-bottom');
@@ -433,7 +443,8 @@ function startNextTypewriter() {
   var i=0, buffer='';
   function tick() {
     if(i>=text.length) {
-      // 1つ分のタイプライター完了 → stableJpに確定追加
+      // 1つ分のタイプライター完了 → stableJpに確定追加（追加位置を latestJpStart に記録）
+      latestJpStart=stableJp.length;
       stableJp+=text;
       recentJpCtx=stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
       setTimeout(function(){ startNextTypewriter(); },200);
@@ -512,11 +523,14 @@ function recordChunk(stream) {
   document.getElementById('transcript-interim').textContent='🎙 録音中...';
   if(speechStartAt===0) speechStartAt=Date.now();
   clearTimeout(groqChunkTimer);
+  // 初回チャンクは短く（3.5秒）→ 最初の文字起こしを早める。以降は通常7秒。
+  var chunkMs = isFirstChunk ? GROQ_FIRST_CHUNK_MS : GROQ_CHUNK_MS;
+  isFirstChunk=false;
   groqChunkTimer=setTimeout(function() {
     if(mediaRecorder&&mediaRecorder.state==='recording') {
       try{mediaRecorder.stop();}catch(e){}
     }
-  }, GROQ_CHUNK_MS);
+  }, chunkMs);
 }
 
 // キューに溜まった音声Blobを順番にGroq APIへ送信（1件ずつ直列処理）
@@ -693,10 +707,13 @@ function startListening() {
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!isGroqMode()&&!SR) { showErr('⚠️ このブラウザは音声認識に対応していません（Groq Keyを設定するか Safari / Chrome を使用）'); return; }
   isOn=true; lastTransAt=Date.now(); speechStartAt=0; isForcedStop=false; lastInterim='';
+  isFirstChunk=true;  // 初回チャンクは短い録音時間を使う
   if(isGroqMode()) {
     // Groqモード: MediaRecorder + Whisper Large v3 Turbo
-    startWhisperChunk();
+    // 即時フィードバック（getUserMediaの許可ダイアログが出る前から表示）
     setBadge('b-mic','🟡 Whisper','bon');
+    document.getElementById('transcript-interim').textContent='🎙 マイク接続中...';
+    startWhisperChunk();
   } else {
     // フォールバック: ブラウザ内蔵Web Speech API
     recognition=buildRecognition();
@@ -715,11 +732,11 @@ function stopListening() {
   // Web Speech API 停止
   clearTimeout(chunkTimer); clearTimeout(chunkMaxTimer);
   if(recognition) { try{recognition.stop();}catch(e){} recognition=null; }
-  // Groqモード 停止
+  // Groqモード 停止（mediaStreamはセッション間で保持→次回Start時に即座に録音開始）
   clearTimeout(groqChunkTimer);
   if(mediaRecorder&&mediaRecorder.state!=='inactive') { try{mediaRecorder.stop();}catch(e){} }
   mediaRecorder=null; audioChunks=[];
-  if(mediaStream) { mediaStream.getTracks().forEach(function(t){t.stop();}); mediaStream=null; }
+  // mediaStreamは破棄しない（次回startListeningで再利用し、マイク許可ダイアログをスキップ）
   groqQueue=[]; groqProcessing=false;
   clearInterval(elapsedLoop);
   stopMeter();
@@ -991,7 +1008,7 @@ function copyModal(){
 function clearAll() {
   if(isOn) stopListening();
   fullText=''; lastSnapPos=0;
-  stableJp=''; recentJpCtx='';
+  stableJp=''; latestJpStart=0; recentJpCtx='';
   pendingJpQueue=[]; isTyping=false; clearTimeout(typingTimer);
   translating=false; lastTransAt=0; speechStartAt=0; lastSpeechAt=0;
   lagHistory=[]; transCount=0; startTime=null; isForcedStop=false;
