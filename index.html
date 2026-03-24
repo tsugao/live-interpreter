@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.24</title>
+  <title>🎙️ Live Interpreter v2.25</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.24 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.25 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.24 「確定訳は不変」アーキテクチャ
+// v2.25 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -399,7 +399,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.24）────────
+// ─── 日本語テキストレンダリング（v2.25）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -424,7 +424,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.24）─────────────────────
+// ─── タイプライター表示キュー（v2.25）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, revTail, batchStart) {
@@ -866,7 +866,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.24 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.25 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -953,8 +953,9 @@ function doTranslate() {
     document.getElementById('s-trans').textContent=transCount;
     setBadge('b-ai','🤖 完了','bon');
     // ラグ計測はタイプライター開始時（表示開始）に行うため batchStart を渡す
+    // ※ ここで renderTranscript() を呼ぶと isTyping=true 時に latestEnStart が古い値のまま
+    //   新テキストまで紫ハイライトされてしまう（二重ハイライトバグの原因）→ 呼ばない
     enqueueTypewriter(jp, batchEnStart, revTailForQueue, batchStart);
-    renderTranscript('');
   })
   .catch(function(e) {
     if(e&&e.name!=='AbortError') { showErr('⚠️ 翻訳エラー: '+e.message); setBadge('b-ai','⚠️ エラー','boff'); }
