@@ -251,8 +251,9 @@ var fullText     = '';
 // v2.15 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
+var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
 var stableJp      = '';     // 確定済み日本語（一切変更しない）
-var latestJpStart = 0;      // stableJp内の「最新バッチ開始位置」（紫ハイライト用）
+var latestJpStart = 0;      // stableJp内の「最新バッチ開始位置」（日本語紫ハイライト用）
 var recentJpCtx   = '';     // 直近確定訳（翻訳プロンプトの文脈用・最後6文程度）
 var isForcedStop  = false;  // CHUNK_MAX 強制停止フラグ（Web Speech APIモード用）
 var lastInterim   = '';     // iOSのinterim救済用（Web Speech APIモード）
@@ -386,8 +387,8 @@ function renderTranscript(interim) {
     el.textContent='（英語音声をここに表示）'; el.style.color='#555';
   } else {
     var html='';
-    if(lastSnapPos>0) html+='<span class="hl-committed">'+esc(fullText.slice(0,lastSnapPos))+'</span>';
-    if(lastSnapPos<fullText.length) html+='<span class="hl-active">'+esc(fullText.slice(lastSnapPos))+'</span>';
+    if(latestEnStart>0) html+='<span class="hl-committed">'+esc(fullText.slice(0,latestEnStart))+'</span>';
+    if(latestEnStart<fullText.length) html+='<span class="hl-active">'+esc(fullText.slice(latestEnStart))+'</span>';
     el.innerHTML=html; el.style.color='';
   }
   // Groqモードではinterimをシステムが管理するため上書きしない
@@ -427,9 +428,9 @@ function renderJapanese() { renderJpDisplay(stableJp,''); }
 // ─── タイプライター表示キュー（v2.15）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
-function enqueueTypewriter(text) {
+function enqueueTypewriter(text, enStart) {
   if(!text) return;
-  pendingJpQueue.push(text);
+  pendingJpQueue.push({text:text, enStart:enStart});
   if(!isTyping) startNextTypewriter();
 }
 function startNextTypewriter() {
@@ -439,12 +440,17 @@ function startNextTypewriter() {
     return;
   }
   isTyping=true;
-  var text=pendingJpQueue.shift();
+  var item=pendingJpQueue.shift();
+  var text=item.text;
+  // タイプライター開始時: 直前の JP・英語ハイライトを同時にリセット（グレーへ）
+  latestJpStart=stableJp.length;   // 前バッチ JP → jp-stable（薄青）
+  latestEnStart=item.enStart;      // 前バッチ英語 → hl-committed（グレー）、今バッチ以降 → hl-active（紫）
+  renderTranscript('');            // 英語ハイライトを即時更新
   var i=0, buffer='';
   function tick() {
     if(i>=text.length) {
-      // 1つ分のタイプライター完了 → stableJpに確定追加（追加位置を latestJpStart に記録）
-      latestJpStart=stableJp.length;
+      // タイプライター完了 → stableJp に確定追加。latestJpStart はここには触らない
+      // （完了時点で latestJpStart は既にこのバッチの先頭を指しており、紫ハイライトが維持される）
       stableJp+=text;
       recentJpCtx=stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
       setTimeout(function(){ startNextTypewriter(); },200);
@@ -772,6 +778,7 @@ function doTranslate() {
 
   translating=true;
   var snapshot=fullText.length;
+  var batchEnStart=lastSnapPos;   // このバッチの英語開始位置（タイプライターに渡す）
   var batchStart=speechStartAt>0?speechStartAt:Date.now();
   lastTransAt=Date.now();
   setBadge('b-ai','🤖 翻訳中…','bwait');
@@ -809,7 +816,7 @@ function doTranslate() {
     setBadge('b-ai','🤖 完了','bon');
     var lb=document.getElementById('jp-lag-badge');
     if(lb) lb.textContent='⏱ '+lagSec+'s';
-    enqueueTypewriter(jp);  // タイプライターキューへ追加（stableJpへの追記はtick完了後）
+    enqueueTypewriter(jp, batchEnStart);  // 英語開始位置も渡してハイライトを同期
     renderTranscript('');
   })
   .catch(function(e) {
@@ -1007,7 +1014,7 @@ function copyModal(){
 // ─── クリア ──────────────────────────────────
 function clearAll() {
   if(isOn) stopListening();
-  fullText=''; lastSnapPos=0;
+  fullText=''; lastSnapPos=0; latestEnStart=0;
   stableJp=''; latestJpStart=0; recentJpCtx='';
   pendingJpQueue=[]; isTyping=false; clearTimeout(typingTimer);
   translating=false; lastTransAt=0; speechStartAt=0; lastSpeechAt=0;
