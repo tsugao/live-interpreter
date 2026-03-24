@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.13</title>
+  <title>🎙️ Live Interpreter v2.14</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.13 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.14 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -292,15 +292,18 @@ var modalContent  = '';
 var modalName     = '';
 
 // ─── 定数 ───────────────────────────────────
-var PAUSE_MS        = 2500;   // 無音停止までの時間
-var CHUNK_MAX       = 10000;  // 強制リスタートまでの最大時間
-var MIN_WAIT_MS     = 800;
-var FORCE_MS        = 8000;
-var MIN_WORDS       = 10;
-var CTX_WORDS       = 150;
-var MAX_WINDOW_WORDS  = 150;  // ウィンドウ最大語数（超えたら古い部分をstableへスライド）
-var ACTIVE_EN_WORDS   = 50;   // 表示上アンダーラインを付ける最大語数（最新N語分のJPのみ下線）
-var GROQ_CHUNK_MS     = 6000; // Groqモード: 1チャンクの録音時間(ms)
+var PAUSE_MS        = 2500;   // 無音停止までの時間（Web Speech APIモード）
+var CHUNK_MAX       = 10000;  // 強制リスタートまでの最大時間（Web Speech APIモード）
+// ── 翻訳タイミング ──────────────────────────────────────────────────
+// Groq高速化により翻訳トリガーが頻発しやすいため、間隔を広めに設定
+// 「意味のある文節単位で1回翻訳」を基本方針とする
+var MIN_WAIT_MS     = 5000;   // 翻訳間隔の最小値（5秒）: 連続更新を防ぐ
+var FORCE_MS        = 20000;  // 強制翻訳タイムアウト（20秒）: 文末記号がなくても翻訳
+var MIN_WORDS       = 20;     // 翻訳開始の最小語数（20語）: 断片では翻訳しない
+var CTX_WORDS       = 200;    // コンテキスト語数（多めにして意訳精度を上げる）
+var MAX_WINDOW_WORDS  = 80;   // ウィンドウ最大語数: 絞ることで翻訳対象を集中・高速化
+var ACTIVE_EN_WORDS   = 40;   // アンダーライン表示の最大語数
+var GROQ_CHUNK_MS     = 7000; // Groqモード: 1チャンクの録音時間(7秒 = 文境界を捉えやすい)
 var SUMMARY_MS  = 90000;
 var SUMMARY_MIN = 30;
 
@@ -578,7 +581,8 @@ function flushGroqQueue() {
       lastSpeechAt=Date.now();
       document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
       renderTranscript('');
-      maybeTranslate(true);
+      // immediate=false: MIN_WAIT_MS / MIN_WORDS / 文末記号を尊重し、頻発翻訳を抑制
+      maybeTranslate(false);
     }
     flushGroqQueue();
   })
