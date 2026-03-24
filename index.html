@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.3</title>
+  <title>🎙️ Live Interpreter v2.4</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -75,7 +75,7 @@
     #transcript-committed { font-size:13px; line-height:1.9; word-break:break-word; }
     #transcript-interim   { font-size:13px; line-height:1.9; color:var(--yellow);
                              word-break:break-word; opacity:.8; }
-    .hl-committed { color:#666; }
+    .hl-committed { color:#aaa; }
     .hl-active    { background:rgba(204,93,232,0.18); border-bottom:2px solid #cc5de8;
                     border-radius:2px; padding:0 1px; color:#ccc; }
     #jp-display {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.3 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.4 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -242,11 +242,12 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.2 翻訳状態
-var activeStart   = 0;      // アクティブ翻訳ウィンドウの英語開始位置（コミット後に引き戻し可）
+// v2.4 翻訳状態
+var activeStart   = 0;      // アクティブ翻訳ウィンドウの英語開始位置
 var lastSnapPos   = 0;      // 最後の翻訳時点での fullText 長
-var stableJp      = '';     // 完全確定済み日本語（変更なし）
-var activeJp      = '';     // 現在のアクティブ翻訳（常に下線表示）
+var stableJp      = '';     // 完全確定済み日本語（下線なし）
+var activeJp      = '';     // 現在のアクティブ翻訳（差分のみ下線）
+var prevActiveJp  = '';     // 一つ前のアクティブ翻訳（差分計算用）
 var recentJpCtx   = '';     // 翻訳文脈用の直近JP
 var isForcedStop  = false;  // CHUNK_MAX 強制停止フラグ
 
@@ -363,35 +364,40 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.2）────────
-// stableJp：完全確定済み（下線なし）
-// activeJp：更新中（常に全体を下線表示 — 差分計算なし）
-// stableJp の末尾と activeJp が重複する場合は末尾を除去して表示を自然にする
-function longestSuffixPrefixOverlap(a, b) {
-  // a の末尾と b の先頭が一致する最長の長さを返す（最大60文字）
-  var maxLen = Math.min(a.length, b.length, 60);
-  for (var len = maxLen; len > 3; len--) {
-    if (a.slice(-len) === b.slice(0, len)) return len;
-  }
-  return 0;
+// ─── 日本語テキストレンダリング（v2.4）────────
+// stableJp  : 確定済み（下線なし・薄青）
+// activeJp  : 更新中（prevActiveJp との差分のみ下線）
+//   - 共通プレフィックス部分 → jp-active-same（下線なし）
+//   - 変化・追加部分        → jp-updated（下線あり）
+//   - prevActiveJp が空なら全体を jp-updated
+function commonPrefixLen(a, b) {
+  var i=0, len=Math.min(a.length, b.length);
+  while(i<len && a[i]===b[i]) i++;
+  return i;
 }
 function renderJapanese() {
   var el=document.getElementById('jp-display');
   if(!stableJp && !activeJp) {
     el.innerHTML='<span id="jp-ph">翻訳結果がここに表示されます<br>'
-      +'<span style="font-size:10px;opacity:.5">続く音声で随時更新・下線部が更新中の箇所です</span></span>';
+      +'<span style="font-size:10px;opacity:.5">続く音声で随時更新・下線部が変更箇所です</span></span>';
     return;
   }
   var html='';
-  // stableJp と activeJp の重複を除去してから表示
-  var displayStable = stableJp;
-  if(stableJp && activeJp) {
-    var overlap = longestSuffixPrefixOverlap(stableJp, activeJp);
-    if(overlap > 0) displayStable = stableJp.slice(0, -overlap);
+  if(stableJp) html+='<span class="jp-stable">'+esc(stableJp).replace(/\n/g,'<br>')+'</span>';
+  if(activeJp) {
+    if(!prevActiveJp) {
+      // このブロック初回翻訳 → 全体を下線
+      html+='<span class="jp-updated">'+esc(activeJp).replace(/\n/g,'<br>')+'</span>';
+    } else {
+      // 前回訳との共通プレフィックスは下線なし、変化部分だけ下線
+      var cp=commonPrefixLen(prevActiveJp, activeJp);
+      var same=activeJp.slice(0,cp);
+      var changed=activeJp.slice(cp);
+      if(same)    html+='<span class="jp-active-same">'+esc(same).replace(/\n/g,'<br>')+'</span>';
+      if(changed) html+='<span class="jp-updated">'+esc(changed).replace(/\n/g,'<br>')+'</span>';
+      if(!same&&!changed) html+='<span class="jp-updated">'+esc(activeJp).replace(/\n/g,'<br>')+'</span>';
+    }
   }
-  if(displayStable) html+='<span class="jp-stable">'+esc(displayStable).replace(/\n/g,'<br>')+'</span>';
-  // activeJp は常に全体を下線表示（差分計算なし・バグ修正）
-  if(activeJp) html+='<span class="jp-updated">'+esc(activeJp).replace(/\n/g,'<br>')+'</span>';
   el.innerHTML=html;
   var bottom=document.getElementById('split-bottom');
   requestAnimationFrame(function(){ bottom.scrollTop=bottom.scrollHeight; });
@@ -403,11 +409,11 @@ function renderJapanese() {
 // 翻訳の自然さはプロンプトの recentJpCtx（直近確定訳）で維持
 function commitActiveTranslation() {
   if(!activeJp) return;
-  stableJp    += activeJp;
-  recentJpCtx  = stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
-  activeJp     = '';
-  // activeStart を最後に翻訳したスナップ位置まで進める（重複なし）
-  activeStart  = lastSnapPos;
+  stableJp     += activeJp;
+  recentJpCtx   = stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
+  activeJp      = '';
+  prevActiveJp  = '';  // 次のブロック開始時は差分なし（全体下線）
+  activeStart   = lastSnapPos;  // 翻訳済み位置まで進める（重複なし）
 
   renderJapanese();
   var lb=document.getElementById('jp-lag-badge');
@@ -573,6 +579,7 @@ function doTranslate() {
     var lagSec=((Date.now()-batchStart)/1000).toFixed(1);
     recordLag(parseFloat(lagSec));
     lastSnapPos=snapshot;
+    prevActiveJp=activeJp;  // 差分計算のために前回訳を保存
     activeJp=jp;
     speechStartAt=0;
     transCount++;
