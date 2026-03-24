@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.27</title>
+  <title>🎙️ Live Interpreter v2.28</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.27 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.28 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,10 +248,11 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.27 「確定訳は不変」アーキテクチャ
+// v2.28 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
+var latestEnEnd   = 0;      // fullText内の「最新バッチ英語終了位置」（ハイライト終端を固定し新テキストに拡張させない）
 var stableJp      = '';     // 確定済み日本語（一切変更しない）
 var latestJpStart = 0;      // stableJp内の「最新バッチ開始位置」（日本語紫ハイライト用）
 var recentJpCtx   = '';     // 直近確定訳（翻訳プロンプトの文脈用・最後6文程度）
@@ -388,8 +389,20 @@ function renderTranscript(interim) {
     el.textContent='（英語音声をここに表示）'; el.style.color='#555';
   } else {
     var html='';
-    if(latestEnStart>0) html+='<span class="hl-committed">'+esc(fullText.slice(0,latestEnStart))+'</span>';
-    if(latestEnStart<fullText.length) html+='<span class="hl-active">'+esc(fullText.slice(latestEnStart))+'</span>';
+    // ハイライト範囲を [latestEnStart, latestEnEnd] に固定する。
+    // latestEnEnd を設けることで fullText が伸びても旧バッチのハイライトが新テキストに
+    // 拡張されなくなり「①+②が同時ハイライト」問題を根本解決する。
+    // latestEnStart=999999999（番兵値）または =0（初期）はハイライトなし。
+    if(latestEnStart > 0 && latestEnStart < 999999999 && latestEnEnd > latestEnStart) {
+      html += '<span class="hl-committed">'+esc(fullText.slice(0, latestEnStart))+'</span>';
+      html += '<span class="hl-active">'+esc(fullText.slice(latestEnStart, latestEnEnd))+'</span>';
+      if(latestEnEnd < fullText.length) {
+        html += '<span class="hl-committed">'+esc(fullText.slice(latestEnEnd))+'</span>';
+      }
+    } else {
+      // ハイライトなし（番兵値・初期・clear中）: 全テキストをグレー表示
+      html += '<span class="hl-committed">'+esc(fullText)+'</span>';
+    }
     el.innerHTML=html; el.style.color='';
   }
   // Groqモードではinterimをシステムが管理するため上書きしない
@@ -401,7 +414,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.27）────────
+// ─── 日本語テキストレンダリング（v2.28）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -429,14 +442,16 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.27）─────────────────────
+// ─── タイプライター表示キュー（v2.28）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
-function enqueueTypewriter(text, enStart, revTail, batchStart) {
+function enqueueTypewriter(text, enStart, enEnd, revTail, batchStart) {
   if(!text) return;
+  // enStart: このバッチの英語開始位置（ハイライト用）
+  // enEnd  : このバッチの英語終了位置（ハイライト終端固定用）
   // revTail: 切り戻すべき末尾文字列（位置ではなく内容で保持→タイムラグによるズレ防止）
   // batchStart: 音声入力開始時刻（タイプライター表示開始までの遅延計測用）
-  pendingJpQueue.push({text:text, enStart:enStart, revTail:revTail||'', batchStart:batchStart||0});
+  pendingJpQueue.push({text:text, enStart:enStart, enEnd:enEnd||0, revTail:revTail||'', batchStart:batchStart||0});
   if(!isTyping) startNextTypewriter();
 }
 function startNextTypewriter() {
@@ -462,6 +477,7 @@ function startNextTypewriter() {
   // ② 旧ハイライトを先に消す（JP: 薄青へ、EN: 全ハイライト消去）
   latestJpStart=stableJp.length;
   latestEnStart=999999999;     // 全ての英語ハイライトを消す（番兵値）
+  latestEnEnd=0;               // 終端もリセット
   renderJpDisplay(stableJp,'');
   renderTranscript('');
 
@@ -479,6 +495,7 @@ function startNextTypewriter() {
   enHighlightTimer=setTimeout(function() {
     enHighlightTimer=null;
     latestEnStart=item.enStart;
+    latestEnEnd=item.enEnd;    // 終端を固定 → fullText拡張時も旧ハイライトが広がらない
     renderTranscript('');
   }, 400);
 
@@ -632,10 +649,8 @@ function flushGroqQueue() {
         fullText+=text.trim()+' ';
         lastSpeechAt=Date.now();
         document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
-        // タイプライター動作中に新テキストが追加されると、古い latestEnStart が
-        // 新テキストまでカバーして「旧ハイライト＋新テキスト」が同時に紫になる。
-        // → isTyping=true の場合は必ず番兵値でハイライトを消してから再描画する。
-        if(isTyping) { clearTimeout(enHighlightTimer); enHighlightTimer=null; latestEnStart=999999999; }
+        // latestEnEnd により [latestEnStart, latestEnEnd] のみ紫ハイライト（renderTranscript参照）
+        // → fullTextが伸びても旧バッチのハイライトが新テキストに拡張されない
         renderTranscript('');
         // immediate=false: MIN_WAIT_MS / MIN_WORDS / 文末記号を尊重し、頻発翻訳を抑制
         maybeTranslate(false);
@@ -882,7 +897,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.27 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.28 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -971,7 +986,7 @@ function doTranslate() {
     // ラグ計測はタイプライター開始時（表示開始）に行うため batchStart を渡す
     // ※ ここで renderTranscript() を呼ぶと isTyping=true 時に latestEnStart が古い値のまま
     //   新テキストまで紫ハイライトされてしまう（二重ハイライトバグの原因）→ 呼ばない
-    enqueueTypewriter(jp, batchEnStart, revTailForQueue, batchStart);
+    enqueueTypewriter(jp, batchEnStart, snapshot, revTailForQueue, batchStart);
   })
   .catch(function(e) {
     if(e&&e.name!=='AbortError') { showErr('⚠️ 翻訳エラー: '+e.message); setBadge('b-ai','⚠️ エラー','boff'); }
@@ -1208,7 +1223,7 @@ function copyModal(){
 // ─── クリア ──────────────────────────────────
 function clearAll() {
   if(isOn) stopListening();
-  fullText=''; lastSnapPos=0; latestEnStart=0;
+  fullText=''; lastSnapPos=0; latestEnStart=0; latestEnEnd=0;
   stableJp=''; latestJpStart=0; recentJpCtx='';
   pendingJpQueue=[]; isTyping=false; clearTimeout(typingTimer);
   clearTimeout(enHighlightTimer); enHighlightTimer=null; jpHasContent=false;
