@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.2</title>
+  <title>🎙️ Live Interpreter v2.3</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.2 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.3 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -398,20 +398,16 @@ function renderJapanese() {
 }
 
 // ─── コミット：activeJp を確定済みに昇格 ────
-// コミット後に英語を RETRO_EN_CHARS 分引き戻すことで、
-// 次の翻訳が直前に確定した部分も含めて自然に訳し直せる
+// activeJp を stableJp に追加して確定。activeStart は lastSnapPos に進める（引き戻しなし）
+// → 重複表示バグの根本原因だった「retroactive pullback」を廃止
+// 翻訳の自然さはプロンプトの recentJpCtx（直近確定訳）で維持
 function commitActiveTranslation() {
   if(!activeJp) return;
-  stableJp     += activeJp;
-  recentJpCtx   = stableJp.split(/[。！？]/).filter(Boolean).slice(-4).join('。');
-  activeJp      = '';
-
-  // 英語の activeStart を RETRO_EN_CHARS 分「引き戻す」
-  // → 次の翻訳でこの範囲の英語を再翻訳し、直前の日本語を自然に改訂できる
-  var retroPos = Math.max(0, lastSnapPos - RETRO_EN_CHARS);
-  // 単語境界まで戻す
-  while(retroPos > 0 && fullText[retroPos] && fullText[retroPos] !== ' ') retroPos--;
-  activeStart = retroPos;
+  stableJp    += activeJp;
+  recentJpCtx  = stableJp.split(/[。！？]/).filter(Boolean).slice(-6).join('。');
+  activeJp     = '';
+  // activeStart を最後に翻訳したスナップ位置まで進める（重複なし）
+  activeStart  = lastSnapPos;
 
   renderJapanese();
   var lb=document.getElementById('jp-lag-badge');
@@ -555,11 +551,12 @@ function doTranslate() {
   var ctx=getCtx();
   var parts=[
     '同時通訳。[翻訳対象]を自然で流暢な日本語に訳せ。'
-    +'文脈を踏まえ、前回の訳より自然・正確になるよう改善してよい。'
+    +'[直近確定訳]の流れ・文体・トーンを引き継ぎ、続きとして自然につながる訳を作れ。'
+    +'[前回訳]があれば内容を引き継ぎ改善してよい。'
     +'[文脈]は理解のみ・訳出禁止。訳文のみ出力・句点で終わること。'
   ];
   if(ctx)         parts.push('[背景] '+ctx);
-  if(recentJpCtx) parts.push('[直近確定訳（参考）] '+recentJpCtx.slice(-150));
+  if(recentJpCtx) parts.push('[直近確定訳（文体・トーンを引き継ぐこと）] '+recentJpCtx.slice(-200));
   if(activeJp)    parts.push('[前回訳（改善・修正可）] '+activeJp);
   if(contextEn)   parts.push('[文脈] '+contextEn);
   parts.push('[翻訳対象] '+activeEn);
