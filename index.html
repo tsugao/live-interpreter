@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.0</title>
+  <title>🎙️ Live Interpreter v2.1</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.0 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.1 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,6 +248,7 @@ var lastSnapPos   = 0;      // 最後の翻訳時点での fullText 長
 var committedJp   = '';     // 確定済み日本語（以後変更なし）
 var activeJp      = '';     // 現在更新中の日本語（下線表示）
 var prevActiveJp  = '';     // 直前の activeJp（差分検出用）
+var baseActiveJp  = '';     // このブロック最初の翻訳（累積下線の基準）
 var recentJpCtx   = '';     // コミット済みJP末尾（次翻訳の文脈）
 var isForcedStop  = false;  // CHUNK_MAX 強制停止フラグ
 
@@ -381,7 +382,10 @@ function renderJapanese() {
   var html='';
   if(committedJp) html+='<span class="jp-stable">'+esc(committedJp).replace(/\n/g,'<br>')+'</span>';
   if(activeJp) {
-    var pfx=commonPrefixLen(prevActiveJp,activeJp);
+    // 比較基準は「このブロック開始時の最初の翻訳」
+    // → 過去に遡って修正された箇所も含め、累積変更をすべて下線表示
+    var base=baseActiveJp;
+    var pfx=commonPrefixLen(base,activeJp);
     var same=activeJp.slice(0,pfx);
     var diff=activeJp.slice(pfx);
     if(same) html+='<span class="jp-active-same">'+esc(same).replace(/\n/g,'<br>')+'</span>';
@@ -399,6 +403,7 @@ function commitActiveTranslation() {
   committedPos  = lastSnapPos;
   recentJpCtx   = committedJp.split(/[。！？]/).filter(Boolean).slice(-4).join('。');
   prevActiveJp  = '';
+  baseActiveJp  = '';   // 次のブロック用にリセット
   activeJp      = '';
   renderJapanese();
   var lb=document.getElementById('jp-lag-badge');
@@ -539,11 +544,17 @@ function doTranslate() {
 
   var contextEn=fullText.slice(0,committedPos).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
   var ctx=getCtx();
-  var parts=['同時通訳。[新規]のみ日本語に意訳。[文脈]は文意把握のみ・絶対に訳出しない。訳文のみ出力・句点で終わること。'];
+  // v2.1: [翻訳対象]全体を毎回自然に訳し直す。前回訳があれば改善・修正してよい。
+  var parts=[
+    '同時通訳。[翻訳対象]を文脈を踏まえて自然な日本語に訳せ。'
+    +'[文脈]は理解のみ・訳出禁止。訳文のみ出力・句点で終わること。'
+    +(activeJp?'前回の訳を参考に、より自然・正確に改善してよい。':'')
+  ];
   if(ctx)         parts.push('[背景] '+ctx);
-  if(recentJpCtx) parts.push('[直前訳] '+recentJpCtx.slice(-100));
+  if(recentJpCtx) parts.push('[確定済み訳] '+recentJpCtx.slice(-120));
+  if(activeJp)    parts.push('[前回訳（改善可）] '+activeJp);
   if(contextEn)   parts.push('[文脈] '+contextEn);
-  parts.push('[新規] '+activeEn);
+  parts.push('[翻訳対象] '+activeEn);
 
   claudeFetch({
     model:'claude-haiku-4-5-20251001',
@@ -558,6 +569,7 @@ function doTranslate() {
     recordLag(parseFloat(lagSec));
     lastSnapPos=snapshot;
     prevActiveJp=activeJp;
+    if(!baseActiveJp) baseActiveJp=jp;  // このブロック最初の翻訳を基準として保存
     activeJp=jp;
     speechStartAt=0;
     transCount++;
@@ -765,7 +777,7 @@ function copyModal(){
 function clearAll() {
   if(isOn) stopListening();
   fullText=''; committedPos=0; lastSnapPos=0;
-  committedJp=''; activeJp=''; prevActiveJp=''; recentJpCtx='';
+  committedJp=''; activeJp=''; prevActiveJp=''; baseActiveJp=''; recentJpCtx='';
   translating=false; lastTransAt=0; speechStartAt=0; lastSpeechAt=0;
   lagHistory=[]; transCount=0; startTime=null; isForcedStop=false;
   summaryPos=0; summaryCount=0; summaryBusy=false;
