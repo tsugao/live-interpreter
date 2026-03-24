@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.20</title>
+  <title>🎙️ Live Interpreter v2.21</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.20 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.21 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.20 「確定訳は不変」アーキテクチャ
+// v2.21 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -273,7 +273,7 @@ var groqChunkTimer = null;  // チャンク録音終了タイマー
 
 var translating   = false;
 var lastTransAt   = 0;
-var speechStartAt = 0;
+var speechStartAt = 0;  // 現バッチ最初のGroqチャンク録音開始時刻（翻訳完了後リセット）
 var lagHistory    = [];
 var transCount    = 0;
 
@@ -399,7 +399,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.20）────────
+// ─── 日本語テキストレンダリング（v2.21）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -424,7 +424,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.20）─────────────────────
+// ─── タイプライター表示キュー（v2.21）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, revTail, batchStart) {
@@ -464,11 +464,11 @@ function startNextTypewriter() {
     document.getElementById('s-lag').textContent=lagSec+'s';
   }
 
-  // ④ 150ms後: 今バッチの英語を紫ハイライト（旧が消えてから新が現れる）
+  // ④ 400ms後: 今バッチの英語を紫ハイライト（旧が消えてから新が現れる — 視覚的に明確に分離）
   setTimeout(function() {
     latestEnStart=item.enStart;
     renderTranscript('');
-  }, 150);
+  }, 400);
 
   var i=0, buffer='';
   function tick() {
@@ -535,7 +535,7 @@ function recordChunk(stream) {
       var mime = (mediaRecorder&&mediaRecorder.mimeType)||mimeType||'audio/mp4';
       var blob = new Blob(audioChunks, {type:mime});
       audioChunks = [];
-      groqQueue.push({blob:blob, mime:mime});
+      groqQueue.push({blob:blob, mime:mime, chunkStart:chunkRecordStart});
       flushGroqQueue();
     }
     // ギャップレス: 即座に次チャンク録音開始
@@ -547,9 +547,9 @@ function recordChunk(stream) {
   mediaRecorder.onerror = function() {
     setTimeout(function(){ if(isOn) startWhisperChunk(); }, 500);
   };
+  var chunkRecordStart=Date.now(); // このチャンクの録音開始時刻（遅延計測用）
   try { mediaRecorder.start(); } catch(e) { showErr('⚠️ 録音開始失敗: '+e.message); return; }
   document.getElementById('transcript-interim').textContent='🎙 録音中...';
-  if(speechStartAt===0) speechStartAt=Date.now();
   clearTimeout(groqChunkTimer);
   // 初回チャンクは短く（3.5秒）→ 最初の文字起こしを早める。以降は通常7秒。
   var chunkMs = isFirstChunk ? GROQ_FIRST_CHUNK_MS : GROQ_CHUNK_MS;
@@ -570,6 +570,9 @@ function flushGroqQueue() {
   .then(function(text) {
     groqProcessing=false;
     if(text&&text.trim()&&isOn) {
+      // 現バッチの最初のチャンク録音開始時刻を speechStartAt にセット
+      // （翻訳後リセットされた後、次に届く最初のチャンクの録音開始時刻が正確な起点）
+      if(speechStartAt===0 && item.chunkStart>0) speechStartAt=item.chunkStart;
       fullText+=text.trim()+' ';
       lastSpeechAt=Date.now();
       document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
@@ -818,7 +821,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.20 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.21 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -841,7 +844,7 @@ function doTranslate() {
     snapshot=lastSnapPos+pending.length;
     isForcedTranslation=true;  // 境界なし強制 → 末尾1文がぶつ切りの可能性 → リビジョン必要
   }
-  if(!translateEn||translateEn.split(/\s+/).filter(Boolean).length<1) return;
+  if(!translateEn||translateEn.split(/\s+/).filter(Boolean).length<3) return; // 3語未満は翻訳しない（空・ゴミテキスト対策）
 
   // リビジョン対象: 強制翻訳時のみ末尾1文を切り戻す。センテンス境界ありの場合は不要。
   var revStart = isForcedTranslation ? findRevisionStart(stableJp) : stableJp.length;
@@ -929,7 +932,17 @@ function sanitizeJp(t) {
     /^※/,
     /がないため/,
     /ため[、,]?(新規|翻訳)/,
-    /^以下(は|に)/
+    /^以下(は|に)/,
+    // 無音・空テキスト時のClaudeの謝罪・説明パターン
+    /^申し訳/,
+    /^すみません/,
+    /^恐れ入り/,
+    /翻訳対象のテキスト/,
+    /テキストが(記載|提供|見当|存在)/,
+    /翻訳する(こと|もの)が(でき|ありません)/,
+    /英語.*テキスト.*ご提供/,
+    /喜んでお手伝い/,
+    /ご提供いただければ/
   ];
   var lines=t.split('\n');
   var filtered=lines.filter(function(line) {
