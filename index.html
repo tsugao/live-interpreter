@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.23</title>
+  <title>🎙️ Live Interpreter v2.24</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.23 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.24 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.23 「確定訳は不変」アーキテクチャ
+// v2.24 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -299,12 +299,12 @@ var PAUSE_MS        = 2500;   // 無音停止までの時間（Web Speech APIモ
 var CHUNK_MAX       = 10000;  // 強制リスタートまでの最大時間（Web Speech APIモード）
 // ── 翻訳タイミング ──────────────────────────────────────────────────
 // センテンス境界まで待ってから翻訳するため、語数・時間の閾値を低めに設定し遅延を5秒程度に抑える
-var MIN_WAIT_MS     = 1000;   // 翻訳間隔の最小値（1秒）
-var FORCE_MS        = 8000;   // 強制翻訳タイムアウト（8秒、センテンス境界がなくても翻訳）
-var MIN_WORDS       = 5;      // 翻訳開始の最小新規語数（センテンス境界待ちと組み合わせ）
+var MIN_WAIT_MS     = 2000;   // 翻訳間隔の最小値（2秒）
+var FORCE_MS        = 9000;   // 強制翻訳タイムアウト（9秒、センテンス境界がなくても翻訳）
+var MIN_WORDS       = 7;      // 翻訳開始の最小新規語数（センテンス境界待ちと組み合わせ）
 var CTX_WORDS       = 200;    // 翻訳プロンプトへ送る英語コンテキスト語数
-var GROQ_CHUNK_MS        = 3500;  // Groqモード: 1チャンクの録音時間(ms)
-var GROQ_FIRST_CHUNK_MS  = 2000;  // Groqモード: 初回チャンクは短くして最初の文字起こしを早める
+var GROQ_CHUNK_MS        = 5000;  // Groqモード: 1チャンクの録音時間(ms)
+var GROQ_FIRST_CHUNK_MS  = 3000;  // Groqモード: 初回チャンクは短くして最初の文字起こしを早める
 var isFirstChunk         = true;  // 初回チャンクフラグ
 var TYPEWRITER_MS   = 28;     // タイプライター: 通常速度(ms/文字)
 var TYPEWRITER_FAST_MS = 12;  // タイプライター: キュー溜まり時の高速表示(ms/文字)
@@ -399,7 +399,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.23）────────
+// ─── 日本語テキストレンダリング（v2.24）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -424,7 +424,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.23）─────────────────────
+// ─── タイプライター表示キュー（v2.24）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, revTail, batchStart) {
@@ -561,6 +561,46 @@ function recordChunk(stream) {
   }, chunkMs);
 }
 
+// ─── Whisperハリュシネーション検出 ───────────────────────────────
+// 無音/短い音声でWhisperが生成しがちな定型フレーズを除外する
+var WHISPER_HALLUC = [
+  /^thank you\.?$/i,
+  /^thanks\.?$/i,
+  /^thank you for watching\.?$/i,
+  /^thanks for watching\.?$/i,
+  /^thank you very much\.?$/i,
+  /^thanks for your time\.?$/i,
+  /^you\.?$/i,
+  /^bye\.?$/i,
+  /^goodbye\.?$/i,
+  /^please subscribe\.?$/i,
+  /^see you next time\.?$/i,
+  /^like and subscribe\.?$/i,
+  /^\.+$/, // ピリオドのみ
+];
+function isHallucination(text) {
+  var t = text.trim();
+  if (!t) return true;
+  // 定型フレーズ一致
+  for (var i = 0; i < WHISPER_HALLUC.length; i++) {
+    if (WHISPER_HALLUC[i].test(t)) return true;
+  }
+  // 直近のfullTextとの重複チェック：新テキストがfullTextの末尾40文字以内に含まれていればスキップ
+  if (fullText.length > 0) {
+    var tail = fullText.trim().slice(-120).toLowerCase();
+    var newLow = t.toLowerCase();
+    // 新テキストが5語以下かつtailに既に含まれているなら重複とみなす
+    var words = t.split(/\s+/).filter(Boolean).length;
+    if (words <= 6 && tail.indexOf(newLow) !== -1) return true;
+    // 新テキスト全体が直前のfullTextの末尾に非常に近い（80%以上一致）場合もスキップ
+    if (t.length >= 15) {
+      var longerTail = fullText.trim().slice(-t.length - 20).toLowerCase();
+      if (longerTail.indexOf(newLow) !== -1) return true;
+    }
+  }
+  return false;
+}
+
 // キューに溜まった音声Blobを順番にGroq APIへ送信（1件ずつ直列処理）
 function flushGroqQueue() {
   if(groqProcessing||groqQueue.length===0) return;
@@ -570,15 +610,20 @@ function flushGroqQueue() {
   .then(function(text) {
     groqProcessing=false;
     if(text&&text.trim()&&isOn) {
-      // 現バッチの最初のチャンク録音開始時刻を speechStartAt にセット
-      // （翻訳後リセットされた後、次に届く最初のチャンクの録音開始時刻が正確な起点）
-      if(speechStartAt===0 && item.chunkStart>0) speechStartAt=item.chunkStart;
-      fullText+=text.trim()+' ';
-      lastSpeechAt=Date.now();
-      document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
-      renderTranscript('');
-      // immediate=false: MIN_WAIT_MS / MIN_WORDS / 文末記号を尊重し、頻発翻訳を抑制
-      maybeTranslate(false);
+      // ハリュシネーション除外（無音/定型フレーズ/直前テキストの繰り返し）
+      if(isHallucination(text.trim())) {
+        // 静かにスキップ
+      } else {
+        // 現バッチの最初のチャンク録音開始時刻を speechStartAt にセット
+        // （翻訳後リセットされた後、次に届く最初のチャンクの録音開始時刻が正確な起点）
+        if(speechStartAt===0 && item.chunkStart>0) speechStartAt=item.chunkStart;
+        fullText+=text.trim()+' ';
+        lastSpeechAt=Date.now();
+        document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
+        renderTranscript('');
+        // immediate=false: MIN_WAIT_MS / MIN_WORDS / 文末記号を尊重し、頻発翻訳を抑制
+        maybeTranslate(false);
+      }
     }
     flushGroqQueue();
   })
@@ -821,7 +866,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.23 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.24 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
