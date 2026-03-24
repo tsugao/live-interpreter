@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.32</title>
+  <title>🎙️ Live Interpreter v2.33</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.32 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.33 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.32 「確定訳は不変」アーキテクチャ
+// v2.33 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -414,7 +414,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.32）────────
+// ─── 日本語テキストレンダリング（v2.33）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -442,7 +442,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.32）─────────────────────
+// ─── タイプライター表示キュー（v2.33）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, enEnd, revTail, batchStart) {
@@ -897,7 +897,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.32 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.33 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -1144,35 +1144,24 @@ function parseSummary(text) {
 
 // ─── 保存 ────────────────────────────────────
 function flushTrans() {
-  // 最大20秒間、translating=falseになるまで300msポーリングしてからdoTranslateを呼ぶ
-  // tries上限ではなく時間ベースで待つ（doTranslateが完了する前にresolveするバグを防ぐ）
-  var deadline=Date.now()+20000;
-  function waitIdle() {
-    if(translating) {
-      if(Date.now()>deadline) return Promise.resolve(); // タイムアウト
-      return new Promise(function(r){ setTimeout(function(){ waitIdle().then(r); },300); });
-    }
-    return Promise.resolve();
-  }
-  function next(tries) {
-    if(tries>=5) return Promise.resolve(); // 最大5回翻訳試行
-    return waitIdle().then(function(){
-      var rem=fullText.slice(lastSnapPos).trim();
-      if(rem.split(/\s+/).filter(Boolean).length<1) return Promise.resolve();
-      lastTransAt=0; doTranslate();
-      // doTranslateが開始されるのを待ってから次を確認
-      return new Promise(function(r){ setTimeout(function(){ next(tries+1).then(r); },500); });
-    });
-  }
-  return next(0).then(function(){
-    // 最後のdoTranslateが完了するまで待つ（最大30秒）
-    var wait=Date.now()+30000;
-    function waitDone() {
+  // translating フラグをポーリングして待つ汎用ヘルパー（タイムアウトあり）
+  function waitIdle(ms) {
+    var deadline=Date.now()+ms;
+    function poll() {
       if(!translating) return Promise.resolve();
-      if(Date.now()>wait) return Promise.resolve();
-      return new Promise(function(r){ setTimeout(function(){ waitDone().then(r); },300); });
+      if(Date.now()>deadline) return Promise.resolve(); // タイムアウト
+      return new Promise(function(res){ setTimeout(function(){ poll().then(res,res); },300); });
     }
-    return waitDone();
+    return poll();
+  }
+  // ① 進行中の翻訳が終わるまで待つ（最大20秒）
+  return waitIdle(20000).then(function(){
+    // ② 未翻訳テキストがあれば1回だけ doTranslate を起動
+    var rem=fullText.slice(lastSnapPos).trim();
+    if(rem.split(/\s+/).filter(Boolean).length<1) return Promise.resolve();
+    lastTransAt=0; doTranslate();
+    // ③ その doTranslate が完了するまで待つ（最大30秒）
+    return waitIdle(30000);
   });
 }
 function saveSession() {
@@ -1187,7 +1176,8 @@ function saveSession() {
   var ctx=getCtx();
   var savedEn=fullText.trim(); // 翻訳完了後の全英文スナップショット
 
-  flushTrans()
+  // flushTransが失敗してもファイル保存チェーンは必ず続行する
+  flushTrans().catch(function(){})
   // ── Step 1: 英語テキスト保存 ──
   .then(function(){
     savedEn=fullText.trim();
