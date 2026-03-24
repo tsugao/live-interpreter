@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.30</title>
+  <title>🎙️ Live Interpreter v2.32</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.30 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.32 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.30 「確定訳は不変」アーキテクチャ
+// v2.32 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -414,7 +414,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.30）────────
+// ─── 日本語テキストレンダリング（v2.32）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -442,7 +442,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.30）─────────────────────
+// ─── タイプライター表示キュー（v2.32）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, enEnd, revTail, batchStart) {
@@ -897,7 +897,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.30 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.32 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -1144,16 +1144,36 @@ function parseSummary(text) {
 
 // ─── 保存 ────────────────────────────────────
 function flushTrans() {
-  var tries=0;
-  function next() {
-    if(tries++>=8) return Promise.resolve();
-    if(translating) return new Promise(function(r){ setTimeout(function(){next().then(r);},300); });
-    var rem=fullText.slice(lastSnapPos).trim();
-    if(rem.split(/\s+/).filter(Boolean).length<1) return Promise.resolve();
-    lastTransAt=0; doTranslate();
-    return new Promise(function(r){ setTimeout(function(){next().then(r);},2500); });
+  // 最大20秒間、translating=falseになるまで300msポーリングしてからdoTranslateを呼ぶ
+  // tries上限ではなく時間ベースで待つ（doTranslateが完了する前にresolveするバグを防ぐ）
+  var deadline=Date.now()+20000;
+  function waitIdle() {
+    if(translating) {
+      if(Date.now()>deadline) return Promise.resolve(); // タイムアウト
+      return new Promise(function(r){ setTimeout(function(){ waitIdle().then(r); },300); });
+    }
+    return Promise.resolve();
   }
-  return next();
+  function next(tries) {
+    if(tries>=5) return Promise.resolve(); // 最大5回翻訳試行
+    return waitIdle().then(function(){
+      var rem=fullText.slice(lastSnapPos).trim();
+      if(rem.split(/\s+/).filter(Boolean).length<1) return Promise.resolve();
+      lastTransAt=0; doTranslate();
+      // doTranslateが開始されるのを待ってから次を確認
+      return new Promise(function(r){ setTimeout(function(){ next(tries+1).then(r); },500); });
+    });
+  }
+  return next(0).then(function(){
+    // 最後のdoTranslateが完了するまで待つ（最大30秒）
+    var wait=Date.now()+30000;
+    function waitDone() {
+      if(!translating) return Promise.resolve();
+      if(Date.now()>wait) return Promise.resolve();
+      return new Promise(function(r){ setTimeout(function(){ waitDone().then(r); },300); });
+    }
+    return waitDone();
+  });
 }
 function saveSession() {
   if(isOn) stopListening();
@@ -1170,41 +1190,44 @@ function saveSession() {
   flushTrans()
   // ── Step 1: 英語テキスト保存 ──
   .then(function(){
-    savedEn=fullText.trim(); // flushTrans後の最終全文
+    savedEn=fullText.trim();
     var transcript=['# Live Interpreter — English Transcript',
       'Date   : '+saveNow.toLocaleString('ja-JP'),
       'Words  : '+wc,
       ctx?'Context: '+ctx:null,'','---','',savedEn
     ].filter(function(l){return l!==null;}).join('\n');
     saveBlob(transcript,'transcript_'+saveStamp+'.txt');
-    // ── Step 2: 全英文の完全日本語訳を生成 ──
+
+    // ── Step 2: 完全日本語訳 → Step 3: 要約レポート を順番に実行
+    // 各ステップは独立: 翻訳が失敗してもレポートは必ず実行する
     setSaveStatus('📝 完全日本語訳を生成中…');
     return claudeFetch({
       model:'claude-haiku-4-5-20251001',
-      max_tokens:4000,
+      max_tokens:8000,   // Haiku上限に近い値（長文翻訳で途中打ち切りを防ぐ）
       system:'同時通訳者として英語スピーチ全文を自然な日本語に翻訳する。\n・全文を省略なく完全に訳すこと\n・話し言葉のニュアンス・語気を保つこと\n・複数文はまとめず元の文の区切りに沿って訳すこと\n・前置き・コメント・説明は一切不要。訳文のみ出力すること',
       messages:[{role:'user',content:[
         ctx?'【背景情報】 '+ctx:null,
         '【日時】 '+saveNow.toLocaleString('ja-JP'),
-        '【語数】 '+wc+'語',
-        '',
-        '【英語スピーチ全文 — 全文を日本語訳せよ】',
-        savedEn
+        '【語数】 '+wc+'語','',
+        '【英語スピーチ全文 — 全文を日本語訳せよ】',savedEn
       ].filter(Boolean).join('\n')}]
-    },120000);
+    },180000)   // タイムアウト3分（長文でも完了を待てるように）
+    // 翻訳失敗時はnullを返して続行（レポート生成をスキップしない）
+    .catch(function(e){ showErr('⚠️ 日本語訳エラー: '+e.message); return null; });
   })
-  // ── Step 3: 完全日本語訳を保存 ──
+  // ── Step 3: 完全日本語訳を保存 → 要約レポート生成開始 ──
   .then(function(d){
-    var jp=d&&d.content&&d.content[0]?d.content[0].text.trim():'';
-    if(jp) {
-      var jpFile=['# Live Interpreter — 完全日本語訳',
-        '日時: '+saveNow.toLocaleString('ja-JP'),
-        '語数: '+wc+'語',
-        ctx?'背景: '+ctx:null,'','---','',jp
-      ].filter(function(l){return l!==null;}).join('\n');
-      saveBlob(jpFile,'translation_'+saveStamp+'.txt');
+    if(d&&d.content&&d.content[0]) {
+      var jp=d.content[0].text.trim();
+      if(jp) {
+        var jpFile=['# Live Interpreter — 完全日本語訳',
+          '日時: '+saveNow.toLocaleString('ja-JP'),
+          '語数: '+wc+'語',
+          ctx?'背景: '+ctx:null,'','---','',jp
+        ].filter(function(l){return l!==null;}).join('\n');
+        saveBlob(jpFile,'translation_'+saveStamp+'.txt');
+      }
     }
-    // ── Step 4: 要約レポート生成 ──
     setSaveStatus('🤖 要約レポートをClaudeで生成中…');
     return claudeFetch({
       model:'claude-haiku-4-5-20251001',max_tokens:3000,
@@ -1213,15 +1236,15 @@ function saveSession() {
         ctx?'背景: '+ctx:null,'','【英語スピーチ全文】',savedEn].filter(Boolean).join('\n')}]
     },90000);
   })
-  // ── Step 5: レポート保存 ──
+  // ── Step 4: レポート保存 ──
   .then(function(d){
     var r=d&&d.content&&d.content[0]?d.content[0].text.trim():'';
-    saveBlob(r,'report_'+saveStamp+'.md');
+    if(r) saveBlob(r,'report_'+saveStamp+'.md');
     setSaveStatus('✅ 保存完了！（英語・日本語訳・レポート）',true,7000);
   })
   .catch(function(e){
-    showErr('⚠️ 生成エラー: '+e.message);
-    setSaveStatus('⚠️ 一部失敗（英語テキストは保存済み）',true,8000);
+    showErr('⚠️ レポート生成エラー: '+e.message);
+    setSaveStatus('⚠️ レポート失敗（英語・日本語訳は保存済み）',true,8000);
   });
 }
 function saveBlob(content,filename) {
