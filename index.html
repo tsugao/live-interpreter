@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v1.4</title>
+  <title>🎙️ Live Interpreter v1.5</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -157,7 +157,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v1.4 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v1.5 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -289,9 +289,9 @@ var modalName    = '';
 // ─────────────────────────────────────────────
 var PAUSE_MS    = 1800;   // この時間無音が続いたらリスタート（取りこぼし防止のため少し長め）
 var CHUNK_MAX   = 7000;   // 最大待機 ms（無音なくても強制リスタート）
-var MIN_WAIT_MS = 200;    // 翻訳間の最短間隔
-var FORCE_MS    = 3000;   // 語数未満でも強制翻訳するタイムアウト
-var MIN_WORDS   = 5;      // 翻訳開始語数（意味のある単位）
+var MIN_WAIT_MS = 500;    // 翻訳間の最短間隔
+var FORCE_MS    = 6000;   // 語数未満でも強制翻訳するタイムアウト
+var MIN_WORDS   = 12;     // 翻訳開始語数（意味のある単位・短文断片を防ぐ）
 var CTX_WORDS   = 150;    // コンテキスト語数（文意把握用・訳出しない）
 var SUMMARY_MS  = 90000;
 var SUMMARY_MIN = 30;
