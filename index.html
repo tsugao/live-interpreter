@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.5</title>
+  <title>🎙️ Live Interpreter v2.6</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.5 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.6 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -278,9 +278,9 @@ var modalName     = '';
 // ─── 定数 ───────────────────────────────────
 var PAUSE_MS       = 2500;   // 無音停止までの時間（長めに取り自然な文単位にする）
 var CHUNK_MAX      = 10000;  // 強制リスタートまでの最大時間
-var MIN_WAIT_MS    = 500;
-var FORCE_MS       = 6000;
-var MIN_WORDS      = 12;
+var MIN_WAIT_MS    = 800;
+var FORCE_MS       = 8000;
+var MIN_WORDS      = 15;
 var CTX_WORDS      = 150;
 var RETRO_EN_CHARS = 150;    // コミット後に英語を引き戻す文字数（過去の訳の自然な改訂に使用）
 var SUMMARY_MS  = 90000;
@@ -447,7 +447,12 @@ function buildRecognition() {
     if((interim.trim()||finals.trim()) && speechStartAt===0) speechStartAt=Date.now();
     if(interim.trim()||finals.trim()) { lastSpeechAt=Date.now(); resetChunkTimer(); }
     if(finals.trim()) {
-      fullText+=finals.trim()+' ';
+      // iOS再起動時の重複チェック：直前のfullText末尾と同じなら追加しない
+      var candidate=finals.trim()+' ';
+      var tail=fullText.slice(-candidate.length*2);
+      if(!tail.endsWith(finals.trim()) && !tail.endsWith(finals.trim()+' ')) {
+        fullText+=candidate;
+      }
       document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
       renderTranscript(interim);
       maybeTranslate(true);
@@ -557,10 +562,11 @@ function doTranslate() {
   var contextEn=fullText.slice(0,activeStart).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
   var ctx=getCtx();
   var parts=[
-    '同時通訳。[翻訳対象]を自然で流暢な日本語に訳せ。'
-    +'[直近確定訳]の流れ・文体・トーンを引き継ぎ、続きとして自然につながる訳を作れ。'
+    '同時通訳。[翻訳対象]の英語を自然で流暢な日本語に訳せ。'
+    +'[直近確定訳]の文体・トーンを引き継ぎ、続きとして自然につながる訳を作れ。'
     +'[前回訳]があれば内容を引き継ぎ改善してよい。'
-    +'[文脈]は理解のみ・訳出禁止。訳文のみ出力・句点で終わること。'
+    +'[文脈]は背景理解のみ・訳出禁止。'
+    +'【厳守】日本語訳文のみ出力。英語・説明・前置き一切禁止。必ず句点（。）で終わること。'
   ];
   if(ctx)         parts.push('[背景] '+ctx);
   if(recentJpCtx) parts.push('[直近確定訳（文体・トーンを引き継ぐこと）] '+recentJpCtx.slice(-200));
@@ -609,8 +615,7 @@ function doTranslate() {
 function ensureKuten(t) {
   t=t.trim(); if(!t) return t;
   if(/[。！？]$/.test(t)) return t;
-  var i=Math.max(t.lastIndexOf('。'),t.lastIndexOf('！'),t.lastIndexOf('？'));
-  if(i>0&&i>=t.length*0.3) return t.slice(0,i+1);
+  // 途中で切り捨てない → 末尾に句点を追加するだけ
   return t+'。';
 }
 
