@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.17</title>
+  <title>🎙️ Live Interpreter v2.19</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.17 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.19 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.17 「確定訳は不変」アーキテクチャ
+// v2.19 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -399,7 +399,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.17）────────
+// ─── 日本語テキストレンダリング（v2.19）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -424,12 +424,13 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.17）─────────────────────
+// ─── タイプライター表示キュー（v2.19）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
-function enqueueTypewriter(text, enStart, revStart) {
+function enqueueTypewriter(text, enStart, revTail) {
   if(!text) return;
-  pendingJpQueue.push({text:text, enStart:enStart, revStart:revStart});
+  // revTail: 切り戻すべき末尾文字列（位置ではなく内容で保持→タイムラグによるズレ防止）
+  pendingJpQueue.push({text:text, enStart:enStart, revTail:revTail||''});
   if(!isTyping) startNextTypewriter();
 }
 function startNextTypewriter() {
@@ -441,11 +442,12 @@ function startNextTypewriter() {
   isTyping=true;
   var item=pendingJpQueue.shift();
   var text=item.text;
-  // タイプライター開始時: stableJp の末尾1文を切り戻す（リビジョン対象をタイプライターで再表示）
-  if(item.revStart!==undefined && item.revStart<stableJp.length) {
-    stableJp=stableJp.slice(0, item.revStart);
+  // タイプライター開始時: stableJp の末尾が revTail と一致する場合のみ切り戻す
+  // （位置ではなく文字列で判定するため、他のタイプライター完了による stableJp の伸長に安全）
+  if(item.revTail && stableJp.endsWith(item.revTail)) {
+    stableJp=stableJp.slice(0, stableJp.length-item.revTail.length);
   }
-  latestJpStart=stableJp.length;   // 前バッチ JP（末尾1文切り戻し後）→ jp-stable（薄青）
+  latestJpStart=stableJp.length;   // 切り戻し後の末尾 → jp-stable（薄青）
   latestEnStart=item.enStart;      // 今バッチ英語 → hl-active（紫）に同期
   renderTranscript('');
   var i=0, buffer='';
@@ -796,7 +798,7 @@ function maybeTranslate(immediate) {
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.17 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.19 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -823,9 +825,11 @@ function doTranslate() {
 
   // リビジョン対象: 強制翻訳時のみ末尾1文を切り戻す。センテンス境界ありの場合は不要。
   var revStart = isForcedTranslation ? findRevisionStart(stableJp) : stableJp.length;
-  var revisionTail = isForcedTranslation ? stableJp.slice(revStart) : ''; // 末尾1文（強制時のみ）
+  var revisionTail = isForcedTranslation ? stableJp.slice(revStart) : '';
   var olderJpRef = stableJp.slice(0, revStart);
   if(olderJpRef.length>200) olderJpRef='…'+olderJpRef.slice(-200);
+  // 切り戻す文字列を確定（タイプライターへ渡す・位置でなく内容で管理）
+  var revTailForQueue = revisionTail;
 
   var contextEn=fullText.slice(0,lastSnapPos).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
   var ctx=getCtx();
@@ -836,18 +840,33 @@ function doTranslate() {
   lastTransAt=Date.now();
   setBadge('b-ai','🤖 翻訳中…','bwait');
 
-  var parts=[
-    '同時通訳。[新規翻訳対象]の英語を日本語に訳せ。',
-    '[直前の日本語訳末尾]の文末から自然に続くよう訳すこと。',
-    '[直前の日本語訳末尾]は最後の1文のみ自然なつながりのため小修正してよい（大幅変更・削除禁止）。',
-    '[文脈英語]は理解のみ・訳出禁止。',
-    '【厳守】[直前の日本語訳末尾]（修正ありなら修正版）＋新訳のみ出力。英語・説明・前置き一切禁止。必ず句点（。）で終わること。'
-  ];
-  if(ctx)           parts.push('[背景] '+ctx);
-  if(olderJpRef)    parts.push('[確定済み日本語訳（変更禁止・文体参照のみ）] '+olderJpRef);
-  if(revisionTail)  parts.push('[直前の日本語訳末尾（最後の1文のみ小修正可）] '+revisionTail);
-  if(contextEn)     parts.push('[文脈英語（訳出禁止）] '+contextEn);
-  parts.push('[新規翻訳対象] '+translateEn);
+  var parts;
+  if(revisionTail) {
+    // 強制翻訳（センテンス境界なし）: 末尾1文リビジョンあり
+    parts=[
+      '同時通訳。[新規翻訳対象]の英語を日本語に訳せ。',
+      '[直前の日本語訳末尾]の最後の1文のみ、新訳との自然なつながりのために必要なら小修正してよい（大幅変更・削除禁止）。修正不要なら原文のまま出力すること。',
+      '[文脈英語]は理解のみ・訳出禁止。',
+      '【厳守】出力は「（修正後または原文のままの[直前の日本語訳末尾]）＋（新訳）」のみ。[直前の日本語訳末尾]を2回出力するな・重複禁止。説明・コメント絶対禁止。必ず句点（。）で終わること。'
+    ];
+    if(ctx)        parts.push('[背景] '+ctx);
+    if(olderJpRef) parts.push('[確定済み日本語訳（変更禁止・文体参照のみ）] '+olderJpRef);
+    parts.push('[直前の日本語訳末尾（末尾1文のみ小修正可）] '+revisionTail);
+    if(contextEn)  parts.push('[文脈英語（訳出禁止）] '+contextEn);
+    parts.push('[新規翻訳対象] '+translateEn);
+  } else {
+    // センテンス境界あり: シンプルな新規翻訳のみ
+    parts=[
+      '同時通訳。[新規翻訳対象]の英語のみを日本語に訳せ。',
+      '[これまでの日本語訳]の文体・トーンを引き継いで自然につながるよう訳すこと。',
+      '[文脈英語]は理解のみ・訳出禁止。',
+      '【厳守】日本語訳文のみ出力。説明・コメント・前置き絶対禁止。必ず句点（。）で終わること。'
+    ];
+    if(ctx)        parts.push('[背景] '+ctx);
+    if(olderJpRef) parts.push('[これまでの日本語訳（文体参照・変更禁止）] '+olderJpRef);
+    if(contextEn)  parts.push('[文脈英語（訳出禁止）] '+contextEn);
+    parts.push('[新規翻訳対象] '+translateEn);
+  }
 
   claudeFetch({
     model:'claude-haiku-4-5-20251001',
@@ -857,7 +876,9 @@ function doTranslate() {
   .then(function(data) {
     var raw=data&&data.content&&data.content[0]?data.content[0].text.trim():'';
     if(!raw) throw new Error('翻訳結果が空です');
-    var jp=ensureKuten(raw);
+    // リビジョンケースでClaudeが[元の末尾文]+[修正版]+[新訳]を出力した場合の重複除去
+    var deduped = revisionTail ? deduplicateRevision(raw, revisionTail) : raw;
+    var jp=ensureKuten(sanitizeJp(deduped));
     var lagSec=((Date.now()-batchStart)/1000).toFixed(1);
     recordLag(parseFloat(lagSec));
     lastSnapPos=snapshot;
@@ -867,8 +888,7 @@ function doTranslate() {
     setBadge('b-ai','🤖 完了','bon');
     var lb=document.getElementById('jp-lag-badge');
     if(lb) lb.textContent='⏱ '+lagSec+'s';
-    // revStart: タイプライター開始時に末尾1文を切り戻し、リビジョン込みで再タイプ
-    enqueueTypewriter(jp, batchEnStart, revStart);
+    enqueueTypewriter(jp, batchEnStart, revTailForQueue);
     renderTranscript('');
   })
   .catch(function(e) {
@@ -878,6 +898,47 @@ function doTranslate() {
     translating=false;
     setTimeout(function(){ maybeTranslate(false); },100);
   });
+}
+// Claudeが説明文・メタコメントを出力した場合に除去する
+// 「直前の〜ため」「新規翻訳対象のみ〜」などの行を日本語訳から排除
+function sanitizeJp(t) {
+  if(!t) return t;
+  var metaPatterns=[
+    /^直前の日本語訳/,
+    /^新規翻訳対象のみ/,
+    /翻訳対象のみ(訳|翻訳)/,
+    /^なお[、,]/,
+    /^注[:：]/,
+    /^※/,
+    /がないため/,
+    /ため[、,]?(新規|翻訳)/,
+    /^以下(は|に)/
+  ];
+  var lines=t.split('\n');
+  var filtered=lines.filter(function(line) {
+    var l=line.trim();
+    if(!l) return false;
+    for(var i=0;i<metaPatterns.length;i++) {
+      if(metaPatterns[i].test(l)) return false;
+    }
+    return true;
+  });
+  return filtered.length>0 ? filtered.join('\n') : t;
+}
+// Claudeがリビジョン時に「元の末尾文＋修正版＋新訳」を出力した場合の冒頭重複除去
+// output が revTail で始まっている場合、その分を除去して重複を防ぐ
+function deduplicateRevision(output, revTail) {
+  if(!revTail||!output) return output;
+  var o=output.trim(), r=revTail.trim();
+  if(!r) return o;
+  // 完全一致の場合は先頭から revTail 分を除去
+  if(o.startsWith(r)) return o.slice(r.length).trim();
+  // 部分一致: revTail の末尾60文字以上が output 冒頭に出現する場合も除去
+  var checkLen=Math.min(r.length, 60);
+  var suffix=r.slice(-checkLen);
+  var idx=o.indexOf(suffix);
+  if(idx===0) return o.slice(checkLen).trim();
+  return o;
 }
 function ensureKuten(t) {
   t=t.trim(); if(!t) return t;
