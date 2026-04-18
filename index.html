@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter V3</title>
+  <title>🎙️ Live Interpreter V4</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> V3 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> V4 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -164,6 +164,16 @@
     <span class="setup-label">🟡 Groq Key</span>
     <input type="password" id="groq-key" class="setup-input"
            placeholder="gsk_... (無料) ← 高精度STT" oninput="saveGroqKey()">
+  </div>
+  <div class="setup-row">
+    <span class="setup-label">🌐 入力言語</span>
+    <select id="input-lang-select" class="setup-input"
+            style="padding:6px 8px;font-family:inherit;appearance:menulist"
+            onchange="saveInputLang()">
+      <option value="en">🇺🇸 英語固定</option>
+      <option value="zh">🇨🇳 中国語固定</option>
+      <option value="auto">🌐 自動検出</option>
+    </select>
   </div>
   <div class="setup-row">
     <span class="setup-label">📋 背景情報</span>
@@ -307,6 +317,12 @@ var FORCE_MS        = 9000;   // 強制翻訳タイムアウト（9秒、セン�
 var MIN_WORDS       = 7;      // 翻訳開始の最小新規語数（センテンス境界待ちと組み合わせ）
 var MIN_WORDS_COLDSTART = 12; // 冒頭：初回翻訳の語数閾値（V3: PC版と統一・冒頭は文脈を厚めに）
 var CONTEXT_WORDS       = 800;    // 翻訳プロンプトへ送る英語コンテキスト語数（V3: PC版 CONTEXT_WORDS と統一）
+// ── 多言語対応（V4: 中国語追加）──
+// CJK文字（中国語漢字範囲、日本語漢字もカバー）を含む場合、語数判定を文字数ベースに切替
+var CJK_REGEX              = /[\u4E00-\u9FFF]/; // 主に中国語漢字
+var MIN_CHARS_CJK          = 15;   // 中国語のとき: 15文字以上で翻訳対象
+var MIN_CHARS_COLDSTART_CJK = 25;  // 中国語の初回: 25文字以上
+var CONTEXT_CHARS_CJK      = 1600; // 中国語の文脈文字数（英語 800語に相当する情報量）
 var GROQ_CHUNK_MS        = 5000;  // Groqモード: 1チャンクの録音時間(ms)
 var GROQ_FIRST_CHUNK_MS  = 3000;  // Groqモード: 初回チャンクは短くして最初の文字起こしを早める
 var isFirstChunk         = true;  // 初回チャンクフラグ
@@ -323,6 +339,10 @@ var SUMMARY_MIN_WORDS = 30;
   if (k) document.getElementById('claude-key').value = k;
   if (g) document.getElementById('groq-key').value = g;
   if (c) document.getElementById('session-context').value = c;
+  // V4: 入力言語を復元（デフォルト: en = 英語固定）
+  var lang = localStorage.getItem('input_lang') || 'en';
+  var langSel = document.getElementById('input-lang-select');
+  if (langSel) Array.prototype.forEach.call(langSel.options, function(o){ o.selected = (o.value === lang); });
   if (k) document.getElementById('setup-panel').style.display = 'none';
 })();
 
@@ -338,6 +358,9 @@ function getKey()      { return document.getElementById('claude-key').value.trim
 function getGroqKey()  { return document.getElementById('groq-key').value.trim() || localStorage.getItem('groq_key') || ''; }
 function isGroqMode()  { return !!getGroqKey(); }
 function getCtx()      { return document.getElementById('session-context').value.trim() || ''; }
+// V4: 入力言語（en/zh/auto）
+function saveInputLang() { var s=document.getElementById('input-lang-select'); if(s) localStorage.setItem('input_lang', s.value); }
+function getInputLang()  { var s=document.getElementById('input-lang-select'); return s ? s.value : 'en'; }
 function switchTab(n) {
   document.querySelectorAll('.tab-btn').forEach(function(b,i){ b.classList.toggle('active',['main','summary'][i]===n); });
   document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.toggle('active',p.id==='tab-'+n); });
@@ -681,7 +704,11 @@ function sendToGroq(blob, mimeType) {
   var formData=new FormData();
   formData.append('file', blob, 'audio.'+ext);
   formData.append('model', 'whisper-large-v3-turbo');
-  formData.append('language', 'en');
+  // V4: 入力言語に応じて language パラメータを切替（auto は指定なし → Whisper 側自動検出）
+  var il = getInputLang();
+  if (il === 'en')      formData.append('language', 'en');
+  else if (il === 'zh') formData.append('language', 'zh');
+  // auto は language を付けない（Whisper の自動検出に委ねる）
   formData.append('response_format', 'text');
   // 直前のテキストをpromptとして送ることで語彙・文脈の連続性を維持
   var prompt=fullText.trim().split(/\s+/).filter(Boolean).slice(-50).join(' ');
@@ -701,7 +728,11 @@ function buildRecognition() {
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR) return null;
   var r=new SR();
-  r.lang='en-US'; r.continuous=true; r.interimResults=true; r.maxAlternatives=1;
+  // V4: 入力言語に応じて切替（en→en-US, zh→zh-CN, auto→en-US既定）
+  // SpeechRecognition は言語自動検出非対応のため、auto は英語扱い（Groq モードで真の自動検出）
+  var srLangMap = { en:'en-US', zh:'zh-CN', auto:'en-US' };
+  r.lang = srLangMap[getInputLang()] || 'en-US';
+  r.continuous=true; r.interimResults=true; r.maxAlternatives=1;
 
   r.onresult=function(event) {
     var interim='', finals='';
@@ -856,13 +887,20 @@ function stopListening() {
 }
 
 // ─── 翻訳タイミング判定 ──────────────────────
-function hasSentEnd(t) { return /[.!?](\s|$)/.test(t); }
+// V4: 中文の 。！？ も文末として扱う
+function hasSentEnd(t) { return /[.!?。！？](\s|$)/.test(t); }
 
-// 英語テキスト内の「最後のセンテンス末尾位置」を返す（. ! ? の直後の位置）
+// テキスト内の「最後のセンテンス末尾位置」を返す（. ! ? / 。！？ の直後の位置）
 // センテンス境界が見つからない場合は -1
 function findLastSentenceEnd(text) {
   for(var i=text.length-1; i>=0; i--) {
-    if(/[.!?]/.test(text[i]) && (i===text.length-1 || /\s/.test(text[i+1]))) {
+    var ch = text[i];
+    // 英文: . ! ? は後続スペース or 末尾が必要
+    if (/[.!?]/.test(ch) && (i===text.length-1 || /\s/.test(text[i+1]))) {
+      return i+1;
+    }
+    // 中文: 。！？ は後続スペース不要
+    if (/[。！？]/.test(ch)) {
       return i+1;
     }
   }
@@ -887,31 +925,39 @@ function maybeTranslate(immediate) {
   if(translating) return;
   var newEn=fullText.slice(lastSnapPos).trim();
   if(!newEn) return;
-  var words=newEn.split(/\s+/).filter(Boolean).length;
   var wait=Date.now()-lastTransAt;
   if(wait<MIN_WAIT_MS) return;
-  // センテンス境界（. ! ?）で区切れるか確認
+  // センテンス境界（. ! ? / 。！？）で区切れるか確認
   var hasSent=(findLastSentenceEnd(newEn)>0);
-  // V3: 冒頭（初回翻訳前）は MIN_WORDS_COLDSTART まで蓄積（文脈が揃った状態で翻訳）
   var isColdStart = transCount === 0;
-  var threshold   = isColdStart ? MIN_WORDS_COLDSTART : MIN_WORDS;
-  if(words<threshold && !hasSent) { if(wait>=FORCE_MS) doTranslate(); return; }
-  // センテンス境界あり、または語数十分、または強制タイムアウト → 翻訳
+  // V4: CJK（中国語漢字）を含む場合は文字数ベース判定に切替
+  var hasCJK = CJK_REGEX.test(newEn);
+  var threshold, tokens;
+  if (hasCJK) {
+    threshold = isColdStart ? MIN_CHARS_COLDSTART_CJK : MIN_CHARS_CJK;
+    tokens = newEn.length;
+  } else {
+    threshold = isColdStart ? MIN_WORDS_COLDSTART : MIN_WORDS;
+    tokens = newEn.split(/\s+/).filter(Boolean).length;
+  }
+  if(tokens<threshold && !hasSent) { if(wait>=FORCE_MS) doTranslate(); return; }
+  // センテンス境界あり、または閾値到達、または強制タイムアウト → 翻訳
   if(hasSent||wait>=FORCE_MS) doTranslate();
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.34 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（V4: 中国語対応・言語中立プロンプト）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
+// ④ CJK（中国語）のときは文字数ベースの閾値・文脈量に切替
 function doTranslate() {
   if(translating) return;
   var pending=fullText.slice(lastSnapPos);
   if(!pending.trim()) return;
   var key=getKey(); if(!key) return;
 
-  // センテンス境界を探す（. ! ? の直後）
+  // センテンス境界を探す（. ! ? / 。！？ の直後）
   var sentEnd=findLastSentenceEnd(pending);
   var translateEn, snapshot, isForcedTranslation;
   if(sentEnd>0) {
@@ -924,7 +970,11 @@ function doTranslate() {
     snapshot=lastSnapPos+pending.length;
     isForcedTranslation=true;  // 境界なし強制 → 末尾1文がぶつ切りの可能性 → リビジョン必要
   }
-  if(!translateEn||translateEn.split(/\s+/).filter(Boolean).length<3) return; // 3語未満は翻訳しない（空・ゴミテキスト対策）
+  // V4: CJK/英語両対応の最小トークン判定
+  var hasCJK = CJK_REGEX.test(translateEn);
+  var minTokens = hasCJK ? 10 : 3;   // 中国語10文字未満・英語3語未満は翻訳スキップ
+  var tokens = hasCJK ? translateEn.length : translateEn.split(/\s+/).filter(Boolean).length;
+  if(!translateEn || tokens < minTokens) return;
 
   // リビジョン対象: 強制翻訳時のみ末尾1文を切り戻す。センテンス境界ありの場合は不要。
   var revStart = isForcedTranslation ? findRevisionStart(stableJp) : stableJp.length;
@@ -934,7 +984,10 @@ function doTranslate() {
   // 切り戻す文字列を確定（タイプライターへ渡す・位置でなく内容で管理）
   var revTailForQueue = revisionTail;
 
-  var contextEn=fullText.slice(0,lastSnapPos).trim().split(/\s+/).filter(Boolean).slice(-CONTEXT_WORDS).join(' ');
+  // V4: CJK は空白区切りがないため文字数ベース、英語は従来通り語数ベース
+  var contextEn = hasCJK
+    ? fullText.slice(0,lastSnapPos).trim().slice(-CONTEXT_CHARS_CJK)
+    : fullText.slice(0,lastSnapPos).trim().split(/\s+/).filter(Boolean).slice(-CONTEXT_WORDS).join(' ');
   var ctx=getCtx();
 
   translating=true;
@@ -943,31 +996,38 @@ function doTranslate() {
   lastTransAt=Date.now();
   setBadge('b-ai','🤖 翻訳中…','bwait');
 
+  // V4: 英中共通のプロンプト。言語中立の表現（「英語」→「原文」）＋中国語の言い淀み例も付与。
   var parts;
   if(revisionTail) {
     // 強制翻訳（センテンス境界なし）: 末尾1文リビジョンあり
     parts=[
-      '同時通訳。[新規翻訳対象]の英語を日本語に訳せ。',
+      '同時通訳。[新規翻訳対象]の原文を日本語に訳せ。',
+      '音声認識で単語・文字の脱落や誤認識が含まれるが、スピーチ全体の文脈から自然な日本語にすること。',
+      '・音声認識で欠落した接続詞・助詞・主語は文脈から補う',
+      '・言い淀み・繰り返し（英："I mean", "you know", "so" / 中："那个", "就是" 等）は省略',
       '[直前の日本語訳末尾]の最後の1文のみ、新訳との自然なつながりのために必要なら小修正してよい（大幅変更・削除禁止）。修正不要なら原文のまま出力すること。',
-      '[文脈英語]は理解のみ・訳出禁止。',
+      '[文脈原文]は理解のみ・訳出禁止。',
       '【厳守】出力は「（修正後または原文のままの[直前の日本語訳末尾]）＋（新訳）」のみ。[直前の日本語訳末尾]を2回出力するな・重複禁止。説明・コメント絶対禁止。必ず句点（。）で終わること。'
     ];
     if(ctx)        parts.push('[背景] '+ctx);
     if(olderJpRef) parts.push('[確定済み日本語訳（変更禁止・文体参照のみ）] '+olderJpRef);
     parts.push('[直前の日本語訳末尾（末尾1文のみ小修正可）] '+revisionTail);
-    if(contextEn)  parts.push('[文脈英語（訳出禁止）] '+contextEn);
+    if(contextEn)  parts.push('[文脈原文（訳出禁止）] '+contextEn);
     parts.push('[新規翻訳対象] '+translateEn);
   } else {
     // センテンス境界あり: シンプルな新規翻訳のみ
     parts=[
-      '同時通訳。[新規翻訳対象]の英語のみを日本語に訳せ。',
+      '同時通訳。[新規翻訳対象]の原文のみを日本語に訳せ。',
+      '音声認識で単語・文字の脱落や誤認識が含まれるが、スピーチ全体の文脈から自然な日本語にすること。',
+      '・音声認識で欠落した接続詞・助詞・主語は文脈から補う',
+      '・言い淀み・繰り返し（英："I mean", "you know", "so" / 中："那个", "就是" 等）は省略',
       '[これまでの日本語訳]の文体・トーンを引き継いで自然につながるよう訳すこと。',
-      '[文脈英語]は理解のみ・訳出禁止。',
+      '[文脈原文]は理解のみ・訳出禁止。',
       '【厳守】日本語訳文のみ出力。説明・コメント・前置き絶対禁止。必ず句点（。）で終わること。'
     ];
     if(ctx)        parts.push('[背景] '+ctx);
     if(olderJpRef) parts.push('[これまでの日本語訳（文体参照・変更禁止）] '+olderJpRef);
-    if(contextEn)  parts.push('[文脈英語（訳出禁止）] '+contextEn);
+    if(contextEn)  parts.push('[文脈原文（訳出禁止）] '+contextEn);
     parts.push('[新規翻訳対象] '+translateEn);
   }
 
@@ -1010,7 +1070,8 @@ function sanitizeJp(t) {
     /^\[新規翻訳対象\]/,
     /^\[直前の日本語訳/,
     /^\[これまでの日本語訳/,
-    /^\[文脈英語/,
+    /^\[文脈英語/,      // V3 互換
+    /^\[文脈原文/,      // V4: 言語中立表記
     /^\[確定済み日本語訳/,
     /^\[背景\]/
   ];
