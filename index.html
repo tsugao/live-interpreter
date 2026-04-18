@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>🎙️ Live Interpreter v2.33</title>
+  <title>🎙️ Live Interpreter V3</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     :root {
@@ -149,7 +149,7 @@
 
 <header>
   <h1>🎙️ Live Interpreter
-    <span style="font-size:10px;color:var(--muted);font-weight:normal"> v2.33 · Claude</span>
+    <span style="font-size:10px;color:var(--muted);font-weight:normal"> V3 · Claude</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -248,7 +248,7 @@
 var isOn         = false;
 var fullText     = '';
 
-// v2.33 「確定訳は不変」アーキテクチャ
+// v2.34 「確定訳は不変」アーキテクチャ
 // 一度確定した日本語訳は絶対に書き換えない。新規英語のみを翻訳してタイプライター表示で追記する。
 var lastSnapPos   = 0;      // fullText内の「翻訳済み末尾位置」。ここ以降が未翻訳の新規英語
 var latestEnStart = 0;      // fullText内の「最新バッチ英語開始位置」（英語紫ハイライト用）
@@ -302,17 +302,18 @@ var PAUSE_MS        = 2500;   // 無音停止までの時間（Web Speech APIモ
 var CHUNK_MAX       = 10000;  // 強制リスタートまでの最大時間（Web Speech APIモード）
 // ── 翻訳タイミング ──────────────────────────────────────────────────
 // センテンス境界まで待ってから翻訳するため、語数・時間の閾値を低めに設定し遅延を5秒程度に抑える
-var MIN_WAIT_MS     = 2000;   // 翻訳間隔の最小値（2秒）
+var MIN_WAIT_MS     = 1500;   // 翻訳間隔の最小値（V3: 2000→1500、PC版と統一）
 var FORCE_MS        = 9000;   // 強制翻訳タイムアウト（9秒、センテンス境界がなくても翻訳）
 var MIN_WORDS       = 7;      // 翻訳開始の最小新規語数（センテンス境界待ちと組み合わせ）
-var CTX_WORDS       = 200;    // 翻訳プロンプトへ送る英語コンテキスト語数
+var MIN_WORDS_COLDSTART = 12; // 冒頭：初回翻訳の語数閾値（V3: PC版と統一・冒頭は文脈を厚めに）
+var CONTEXT_WORDS       = 800;    // 翻訳プロンプトへ送る英語コンテキスト語数（V3: PC版 CONTEXT_WORDS と統一）
 var GROQ_CHUNK_MS        = 5000;  // Groqモード: 1チャンクの録音時間(ms)
 var GROQ_FIRST_CHUNK_MS  = 3000;  // Groqモード: 初回チャンクは短くして最初の文字起こしを早める
 var isFirstChunk         = true;  // 初回チャンクフラグ
 var TYPEWRITER_MS   = 28;     // タイプライター: 通常速度(ms/文字)
 var TYPEWRITER_FAST_MS = 12;  // タイプライター: キュー溜まり時の高速表示(ms/文字)
-var SUMMARY_MS  = 90000;
-var SUMMARY_MIN = 30;
+var SUMMARY_INTERVAL_MS  = 90000;
+var SUMMARY_MIN_WORDS = 30;
 
 // ─── 初期化 ─────────────────────────────────
 (function() {
@@ -414,7 +415,7 @@ function renderTranscript(interim) {
   requestAnimationFrame(function(){ top.scrollTop=top.scrollHeight; });
 }
 
-// ─── 日本語テキストレンダリング（v2.33）────────
+// ─── 日本語テキストレンダリング（v2.34）────────
 // stableJp  : 確定済み（薄青・以降絶対に変更しない）
 // typingText: タイプライター中の文字列（カーソル付き）
 // 一度確定した翻訳は再翻訳・上書き一切禁止
@@ -442,7 +443,7 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── タイプライター表示キュー（v2.33）─────────────────────
+// ─── タイプライター表示キュー（v2.34）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
 // 表示中に次の翻訳が完了してもキューに追加するだけでOK（競合なし）。
 function enqueueTypewriter(text, enStart, enEnd, revTail, batchStart) {
@@ -891,13 +892,16 @@ function maybeTranslate(immediate) {
   if(wait<MIN_WAIT_MS) return;
   // センテンス境界（. ! ?）で区切れるか確認
   var hasSent=(findLastSentenceEnd(newEn)>0);
-  if(words<MIN_WORDS && !hasSent) { if(wait>=FORCE_MS) doTranslate(); return; }
+  // V3: 冒頭（初回翻訳前）は MIN_WORDS_COLDSTART まで蓄積（文脈が揃った状態で翻訳）
+  var isColdStart = transCount === 0;
+  var threshold   = isColdStart ? MIN_WORDS_COLDSTART : MIN_WORDS;
+  if(words<threshold && !hasSent) { if(wait>=FORCE_MS) doTranslate(); return; }
   // センテンス境界あり、または語数十分、または強制タイムアウト → 翻訳
   if(hasSent||wait>=FORCE_MS) doTranslate();
 }
 setInterval(function(){ if(isOn&&!translating) maybeTranslate(false); },300);
 
-// ─── 翻訳実行（v2.33 センテンス境界＋末尾リビジョン）────────
+// ─── 翻訳実行（v2.34 センテンス境界＋末尾リビジョン）────────
 // ① 翻訳対象は lastSnapPos 以降の「完全なセンテンス」のみ（途中で切らない）
 // ② stableJp の末尾1文をリビジョン対象として含め、つながりを自然にする
 // ③ タイプライター開始時に末尾1文を切り戻してから再タイプ（リビジョン反映）
@@ -930,7 +934,7 @@ function doTranslate() {
   // 切り戻す文字列を確定（タイプライターへ渡す・位置でなく内容で管理）
   var revTailForQueue = revisionTail;
 
-  var contextEn=fullText.slice(0,lastSnapPos).trim().split(/\s+/).filter(Boolean).slice(-CTX_WORDS).join(' ');
+  var contextEn=fullText.slice(0,lastSnapPos).trim().split(/\s+/).filter(Boolean).slice(-CONTEXT_WORDS).join(' ');
   var ctx=getCtx();
 
   translating=true;
@@ -969,9 +973,9 @@ function doTranslate() {
 
   claudeFetch({
     model:'claude-haiku-4-5-20251001',
-    max_tokens:700,
+    max_tokens:2048,
     messages:[{role:'user',content:parts.join('\n')}]
-  },18000)
+  },25000,1)  // V3: 18000→25000、1回自動リトライ（PC版 fetchWithRetry 同等）
   .then(function(data) {
     var raw=data&&data.content&&data.content[0]?data.content[0].text.trim():'';
     if(!raw) throw new Error('翻訳結果が空です');
@@ -1044,25 +1048,47 @@ function ensureKuten(t) {
 }
 
 // ─── Claude API ──────────────────────────────
-function claudeFetch(body,timeout) {
-  var ctrl=new AbortController();
-  var tid=setTimeout(function(){ctrl.abort();},timeout||30000);
-  return fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':getKey(),
-             'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify(body), signal:ctrl.signal
-  })
-  .then(function(res) {
-    clearTimeout(tid);
-    if(!res.ok) return res.text().catch(function(){return'';}).then(function(txt){ throw new Error('API '+res.status+': '+txt.slice(0,120)); });
-    return res.json().then(function(d){ if(d.error) throw new Error(d.error.message||JSON.stringify(d.error)); return d; });
-  })
-  .catch(function(e) {
-    clearTimeout(tid);
-    if(e.message==='Load failed'||e.message==='Failed to fetch') throw new Error('通信エラー（APIキーまたはネットワークを確認してください）');
-    throw e;
-  });
+// V3: retries パラメータで自動リトライをオプション化（PC版 fetchWithRetry 同等）
+// - retries=0（省略時）: 従来通りリトライなし
+// - retries=1 以上: タイムアウト/接続エラー時に2秒待機後リトライ
+function claudeFetch(body,timeout,retries) {
+  retries=retries||0;
+  var attempt=0;
+  var to=timeout||30000;
+
+  function tryFetch() {
+    var ctrl=new AbortController();
+    var tid=setTimeout(function(){ctrl.abort();},to);
+    return fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':getKey(),
+               'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify(body), signal:ctrl.signal
+    })
+    .then(function(res) {
+      clearTimeout(tid);
+      if(!res.ok) return res.text().catch(function(){return'';}).then(function(txt){ throw new Error('API '+res.status+': '+txt.slice(0,120)); });
+      return res.json().then(function(d){ if(d.error) throw new Error(d.error.message||JSON.stringify(d.error)); return d; });
+    })
+    .catch(function(e) {
+      clearTimeout(tid);
+      // タイムアウト・接続エラー時は残り回数があればリトライ
+      var msg=(e&&e.message||'').toLowerCase();
+      var isRetryable=(e&&(e.name==='AbortError'||e.name==='TimeoutError'))
+                    ||msg==='load failed'||msg==='failed to fetch'
+                    ||msg.indexOf('timeout')!==-1||msg.indexOf('timed out')!==-1;
+      if(attempt<retries&&isRetryable) {
+        attempt++;
+        console.warn('[claude] 接続エラー、'+attempt+'回目リトライ:',e.message);
+        setBadge('b-ai','🔄 再接続中…','bwait');
+        return new Promise(function(r){ setTimeout(r,2000); }).then(tryFetch);
+      }
+      if(e.message==='Load failed'||e.message==='Failed to fetch') throw new Error('通信エラー（APIキーまたはネットワークを確認してください）');
+      throw e;
+    });
+  }
+
+  return tryFetch();
 }
 
 // ─── 要約 ────────────────────────────────────
@@ -1073,11 +1099,11 @@ function updateSumCd() {
   el.textContent='次の要約まで '+Math.floor(r/60)+':'+String(r%60).padStart(2,'0');
 }
 function startSummaryTimer() {
-  stopSummaryTimer(); summaryNextAt=Date.now()+SUMMARY_MS;
+  stopSummaryTimer(); summaryNextAt=Date.now()+SUMMARY_INTERVAL_MS;
   (function tick(){
     summaryTimer=setTimeout(function(){
-      generateSummary(false).then(function(){ if(isOn){summaryNextAt=Date.now()+SUMMARY_MS;tick();} });
-    },SUMMARY_MS);
+      generateSummary(false).then(function(){ if(isOn){summaryNextAt=Date.now()+SUMMARY_INTERVAL_MS;tick();} });
+    },SUMMARY_INTERVAL_MS);
   })();
   sumCdTimer=setInterval(updateSumCd,1000); updateSumCd();
 }
@@ -1089,7 +1115,7 @@ function generateSummary(manual) {
   if(summaryBusy){ if(manual) showErr('⚠️ 分析中です'); return Promise.resolve(); }
   var nw=fullText.slice(summaryPos).trim().split(/\s+/).filter(Boolean).length;
   var tw=fullText.trim().split(/\s+/).filter(Boolean).length;
-  if(nw<SUMMARY_MIN){ if(manual) showErr('⚠️ テキスト不足（+'+nw+'語 / 最低'+SUMMARY_MIN+'語必要）'); return Promise.resolve(); }
+  if(nw<SUMMARY_MIN_WORDS){ if(manual) showErr('⚠️ テキスト不足（+'+nw+'語 / 最低'+SUMMARY_MIN_WORDS+'語必要）'); return Promise.resolve(); }
   if(!getKey()){ showErr('⚠️ Claude API Keyを設定してください'); return Promise.resolve(); }
   summaryBusy=true; summaryCount++;
   var cap=fullText.length, now=new Date();
@@ -1172,13 +1198,17 @@ function saveSession() {
   setSaveStatus('🔄 未翻訳テキストを翻訳中…');
   // セッション全体で共有する変数
   var saveNow=new Date();
-  var saveStamp=saveNow.toISOString().slice(0,16).replace('T','_').replace(':','-');
+  // V3: 両版で統一 → YYYY-MM-DD_HH-MM-SS（ローカルタイム、秒精度）
+  // （旧実装は toISOString() で UTC を使っており PC 版と時刻ズレがあった）
+  var _pad=function(n){return String(n).padStart(2,'0');};
+  var saveStamp=saveNow.getFullYear()+'-'+_pad(saveNow.getMonth()+1)+'-'+_pad(saveNow.getDate())
+              +'_'+_pad(saveNow.getHours())+'-'+_pad(saveNow.getMinutes())+'-'+_pad(saveNow.getSeconds());
   var ctx=getCtx();
   var savedEn=fullText.trim(); // 翻訳完了後の全英文スナップショット
 
   // flushTransが失敗してもファイル保存チェーンは必ず続行する
   flushTrans().catch(function(){})
-  // ── Step 1: 英語テキスト保存 ──
+  // ── Step 1: 英語テキスト保存 + 日本語訳・レポートを並列生成 ──
   .then(function(){
     savedEn=fullText.trim();
     var transcript=['# Live Interpreter — English Transcript',
@@ -1186,55 +1216,54 @@ function saveSession() {
       'Words  : '+wc,
       ctx?'Context: '+ctx:null,'','---','',savedEn
     ].filter(function(l){return l!==null;}).join('\n');
-    saveBlob(transcript,'transcript_'+saveStamp+'.txt');
+    saveBlob(transcript,'live-interpreter_'+saveStamp+'_transcript.txt');
 
-    // ── Step 2: 完全日本語訳 → Step 3: 要約レポート を順番に実行
-    // 各ステップは独立: 翻訳が失敗してもレポートは必ず実行する
-    setSaveStatus('📝 完全日本語訳を生成中…');
-    return claudeFetch({
+    setSaveStatus('📝 日本語訳・レポートを並列生成中…');
+
+    // 完全日本語訳とレポートを同時並列で生成（直列だと最大4分以上かかりiOSで失敗するため）
+    var translationP = claudeFetch({
       model:'claude-haiku-4-5-20251001',
-      max_tokens:8000,   // Haiku上限に近い値（長文翻訳で途中打ち切りを防ぐ）
+      max_tokens:8000,
       system:'同時通訳者として英語スピーチ全文を自然な日本語に翻訳する。\n・全文を省略なく完全に訳すこと\n・話し言葉のニュアンス・語気を保つこと\n・複数文はまとめず元の文の区切りに沿って訳すこと\n・前置き・コメント・説明は一切不要。訳文のみ出力すること',
       messages:[{role:'user',content:[
         ctx?'【背景情報】 '+ctx:null,
-        '【日時】 '+saveNow.toLocaleString('ja-JP'),
         '【語数】 '+wc+'語','',
         '【英語スピーチ全文 — 全文を日本語訳せよ】',savedEn
       ].filter(Boolean).join('\n')}]
-    },180000)   // タイムアウト3分（長文でも完了を待てるように）
-    // 翻訳失敗時はnullを返して続行（レポート生成をスキップしない）
-    .catch(function(e){ showErr('⚠️ 日本語訳エラー: '+e.message); return null; });
+    },180000).catch(function(e){ showErr('⚠️ 日本語訳エラー: '+e.message); return null; });
+
+    var reportP = claudeFetch({
+      model:'claude-haiku-4-5-20251001',max_tokens:3000,
+      system:'会議・講演の議事録作成専門家。英語スピーチ全文を分析し構造化された日本語レポートをMarkdown形式で作成。\n\n# 📋 スピーチ要約レポート\n## 基本情報\n## エグゼクティブサマリー\n## 主要な内容・論点\n## 話の構成・流れ\n## キーワード・専門用語\n## アクションアイテム（なければ省略）\n\n前置き不要。完全な日本語で。',
+      messages:[{role:'user',content:['語数: '+wc+'語',
+        ctx?'背景: '+ctx:null,'','【英語スピーチ全文】',savedEn].filter(Boolean).join('\n')}]
+    },120000).catch(function(e){ showErr('⚠️ レポートエラー: '+e.message); return null; });
+
+    return Promise.all([translationP, reportP]);
   })
-  // ── Step 3: 完全日本語訳を保存 → 要約レポート生成開始 ──
-  .then(function(d){
-    if(d&&d.content&&d.content[0]) {
-      var jp=d.content[0].text.trim();
+  // ── Step 2: 両ファイルを保存 ──
+  .then(function(results){
+    var tData=results[0], rData=results[1];
+    if(tData&&tData.content&&tData.content[0]) {
+      var jp=tData.content[0].text.trim();
       if(jp) {
         var jpFile=['# Live Interpreter — 完全日本語訳',
           '日時: '+saveNow.toLocaleString('ja-JP'),
           '語数: '+wc+'語',
           ctx?'背景: '+ctx:null,'','---','',jp
         ].filter(function(l){return l!==null;}).join('\n');
-        saveBlob(jpFile,'translation_'+saveStamp+'.txt');
+        saveBlob(jpFile,'live-interpreter_'+saveStamp+'_translation.txt');
       }
     }
-    setSaveStatus('🤖 要約レポートをClaudeで生成中…');
-    return claudeFetch({
-      model:'claude-haiku-4-5-20251001',max_tokens:3000,
-      system:'会議・講演の議事録作成専門家。英語スピーチ全文を分析し構造化された日本語レポートをMarkdown形式で作成。\n\n# 📋 スピーチ要約レポート\n## 基本情報\n## エグゼクティブサマリー\n## 主要な内容・論点\n## 話の構成・流れ\n## キーワード・専門用語\n## アクションアイテム（なければ省略）\n\n前置き不要。完全な日本語で。',
-      messages:[{role:'user',content:['日時: '+saveNow.toLocaleString('ja-JP'),'語数: '+wc+'語',
-        ctx?'背景: '+ctx:null,'','【英語スピーチ全文】',savedEn].filter(Boolean).join('\n')}]
-    },90000);
-  })
-  // ── Step 4: レポート保存 ──
-  .then(function(d){
-    var r=d&&d.content&&d.content[0]?d.content[0].text.trim():'';
-    if(r) saveBlob(r,'report_'+saveStamp+'.md');
+    if(rData&&rData.content&&rData.content[0]) {
+      var r=rData.content[0].text.trim();
+      if(r) saveBlob(r,'live-interpreter_'+saveStamp+'_report.md');
+    }
     setSaveStatus('✅ 保存完了！（英語・日本語訳・レポート）',true,7000);
   })
   .catch(function(e){
-    showErr('⚠️ レポート生成エラー: '+e.message);
-    setSaveStatus('⚠️ レポート失敗（英語・日本語訳は保存済み）',true,8000);
+    showErr('⚠️ 保存エラー: '+e.message);
+    setSaveStatus('⚠️ 一部失敗（英語テキストは保存済み）',true,8000);
   });
 }
 function saveBlob(content,filename) {
