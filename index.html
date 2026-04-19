@@ -143,6 +143,145 @@
     .p { background:var(--purple); color:#fff; font-size:12px; padding:10px 14px; }
     ::-webkit-scrollbar { width:3px; }
     ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+    /* V4.1: 会話モード UI（話者分離・チャンク型） */
+    :root {
+      --speaker-me-bg:#0e2040; --speaker-me-border:#3b82f6; --speaker-me-fg:#bfdbfe;
+      --speaker-a-bg:#2a143a;  --speaker-a-border:#cc5de8;  --speaker-a-fg:#e8d0ff;
+      --speaker-b-bg:#0f2a1a;  --speaker-b-border:#40c057;  --speaker-b-fg:#c8f5d4;
+      --speaker-c-bg:#2a1f0a;  --speaker-c-border:#fab005;  --speaker-c-fg:#ffe8a8;
+    }
+    /* 会話モード時の切替: セミナー用UIを隠し、会話用コンテナを表示 */
+    body.conv-mode #split-top,
+    body.conv-mode #split-divider,
+    body.conv-mode #split-bottom { display:none; }
+    body.conv-mode #conv-container { display:flex; }
+    #conv-container { display:none; flex:1; min-height:0; flex-direction:column; }
+    #conv-speakers  { background:var(--panel2); border-bottom:1px solid var(--border);
+                      padding:6px 13px; display:flex; gap:8px; align-items:center;
+                      flex-shrink:0; font-size:11px; overflow-x:auto; }
+    .speaker-chip   { display:flex; align-items:center; gap:5px; padding:3px 9px;
+                      border-radius:12px; font-size:11px; white-space:nowrap;
+                      border:1px solid transparent; flex-shrink:0; }
+    .speaker-chip.me { background:var(--speaker-me-bg); color:var(--speaker-me-fg); border-color:var(--speaker-me-border); }
+    .speaker-chip.sp-a { background:var(--speaker-a-bg);  color:var(--speaker-a-fg);  border-color:var(--speaker-a-border); }
+    .speaker-chip.sp-b { background:var(--speaker-b-bg);  color:var(--speaker-b-fg);  border-color:var(--speaker-b-border); }
+    .speaker-chip.sp-c { background:var(--speaker-c-bg);  color:var(--speaker-c-fg);  border-color:var(--speaker-c-border); }
+    .speaker-chip.active { box-shadow:0 0 0 2px rgba(255,255,255,.15); }
+    .speaker-dot    { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+    #conv-messages  { flex:1; min-height:0; overflow-y:auto;
+                      padding:10px 12px 16px; -webkit-overflow-scrolling:touch;
+                      display:flex; flex-direction:column; gap:10px; }
+    .msg-group      { display:flex; flex-direction:column; gap:5px; max-width:88%; }
+    .msg-group.me    { align-self:flex-end;   align-items:flex-end; }
+    .msg-group.other { align-self:flex-start; align-items:flex-start; }
+    .msg-meta       { display:flex; gap:6px; align-items:center; font-size:10px;
+                      color:var(--muted); padding:0 4px; }
+    .msg-meta .lang { background:#0d1020; border:1px solid var(--border); border-radius:8px;
+                      padding:1px 6px; font-size:9px; letter-spacing:.3px; }
+    .msg-avatar     { width:22px; height:22px; border-radius:50%; display:inline-flex;
+                      align-items:center; justify-content:center; font-size:11px;
+                      font-weight:bold; border:1px solid; }
+    .msg-avatar.me   { background:var(--speaker-me-bg); color:var(--speaker-me-fg); border-color:var(--speaker-me-border); }
+    .msg-avatar.sp-a { background:var(--speaker-a-bg);  color:var(--speaker-a-fg);  border-color:var(--speaker-a-border); }
+    .msg-avatar.sp-b { background:var(--speaker-b-bg);  color:var(--speaker-b-fg);  border-color:var(--speaker-b-border); }
+    .msg-avatar.sp-c { background:var(--speaker-c-bg);  color:var(--speaker-c-fg);  border-color:var(--speaker-c-border); }
+    .msg-bubble     { border-radius:14px; padding:9px 12px; font-size:13px; line-height:1.7;
+                      border:1px solid; display:flex; flex-direction:column; gap:6px;
+                      word-break:break-word; }
+    .msg-bubble.me    { background:var(--speaker-me-bg); border-color:#3b82f655; border-bottom-right-radius:4px; }
+    .msg-bubble.sp-a  { background:var(--speaker-a-bg);  border-color:#cc5de855; border-bottom-left-radius:4px; }
+    .msg-bubble.sp-b  { background:var(--speaker-b-bg);  border-color:#40c05755; border-bottom-left-radius:4px; }
+    .msg-bubble.sp-c  { background:var(--speaker-c-bg);  border-color:#fab00555; border-bottom-left-radius:4px; }
+    .msg-source     { font-size:12px; color:#a0a8c0; line-height:1.55;
+                      border-left:2px solid #2a2d45; padding-left:7px; }
+    .msg-trans      { font-size:13px; line-height:1.75; color:var(--text); font-weight:500; }
+    .msg-bubble.me .msg-trans    { color:var(--speaker-me-fg); }
+    .msg-bubble.sp-a .msg-trans  { color:var(--speaker-a-fg); }
+    .msg-bubble.sp-b .msg-trans  { color:var(--speaker-b-fg); }
+    .msg-bubble.sp-c .msg-trans  { color:var(--speaker-c-fg); }
+    .msg-tail       { font-size:9px; color:var(--muted); padding:0 4px; display:flex; gap:6px; }
+    .msg-bubble.typing { opacity:.85; border-style:dashed; }
+    .typing-dot     { display:inline-block; width:4px; height:4px; margin:0 1px;
+                      background:currentColor; border-radius:50%;
+                      animation:blink 1.4s infinite; }
+    .typing-dot:nth-child(2){animation-delay:.2s}
+    .typing-dot:nth-child(3){animation-delay:.4s}
+    @keyframes blink { 0%,80%,100%{opacity:.25}40%{opacity:1} }
+    #conv-ph        { color:var(--muted); font-size:12px; text-align:center; padding:40px 16px;
+                      line-height:1.8; }
+    /* V4.1: 話者チップ アクティブ時のアニメーション */
+    .speaker-chip.active {
+      box-shadow:0 0 0 2px rgba(255,255,255,.22), 0 0 10px currentColor;
+      animation:chip-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes chip-pulse {
+      0%,100% { filter:brightness(1); transform:scale(1); }
+      50%     { filter:brightness(1.15); transform:scale(1.03); }
+    }
+    .speaking-ind {
+      display:inline-block; width:7px; height:7px; border-radius:50%;
+      background:currentColor; animation:speak-blink .8s ease-in-out infinite;
+    }
+    @keyframes speak-blink {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%     { opacity:.35; transform:scale(.7); }
+    }
+    /* V4.1: 会話画面下部の録音中インジケータ */
+    #conv-rec-inline {
+      flex-shrink:0; padding:6px 14px; border-top:1px solid var(--border);
+      background:var(--panel2); display:flex; align-items:center; gap:8px;
+      font-size:11px; color:var(--muted);
+    }
+    #conv-rec-inline.recording { color:var(--yellow); }
+    #conv-rec-inline .rec-dot {
+      width:8px; height:8px; border-radius:50%; background:var(--red);
+      animation:rec-pulse 1s ease-in-out infinite;
+    }
+    @keyframes rec-pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%     { opacity:.4; transform:scale(.7); }
+    }
+    #conv-rec-inline .rec-wave {
+      display:inline-flex; gap:2px; align-items:flex-end; height:14px;
+    }
+    #conv-rec-inline .rec-wave span {
+      display:inline-block; width:3px; background:currentColor; border-radius:1px;
+      animation:rec-bar .9s ease-in-out infinite;
+    }
+    #conv-rec-inline .rec-wave span:nth-child(1){animation-delay:0s;   height:30%}
+    #conv-rec-inline .rec-wave span:nth-child(2){animation-delay:.15s; height:60%}
+    #conv-rec-inline .rec-wave span:nth-child(3){animation-delay:.3s;  height:90%}
+    #conv-rec-inline .rec-wave span:nth-child(4){animation-delay:.45s; height:60%}
+    #conv-rec-inline .rec-wave span:nth-child(5){animation-delay:.6s;  height:30%}
+    @keyframes rec-bar { 0%,100%{transform:scaleY(.3)} 50%{transform:scaleY(1)} }
+    /* V4.1: 認識中（暫定）カード */
+    .msg-bubble.recognizing {
+      background:#0d1020; border-color:#4dabf7aa; border-style:dashed;
+    }
+    .msg-bubble.recognizing .msg-trans {
+      color:var(--muted); font-style:italic;
+    }
+
+    /* V4.1: モード選択ダイアログ */
+    #mode-dialog { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:150;
+                   align-items:center; justify-content:center; padding:16px; }
+    #mode-dialog.open { display:flex; }
+    #mode-dialog-inner { background:var(--panel); border:1px solid var(--border); border-radius:14px;
+                         padding:18px; width:100%; max-width:420px;
+                         box-shadow:0 10px 40px rgba(0,0,0,0.6); }
+    #mode-dialog-title { font-size:15px; font-weight:bold; color:var(--accent); margin-bottom:6px; }
+    #mode-dialog-desc  { font-size:11px; color:var(--muted); margin-bottom:14px; line-height:1.6; }
+    .mode-option { display:flex; align-items:flex-start; gap:10px;
+                   background:#0d1020; border:2px solid var(--border); border-radius:10px;
+                   padding:12px; margin-bottom:8px; cursor:pointer; }
+    .mode-option:active   { border-color:var(--purple); background:#1a1530; }
+    .mode-option.chosen   { border-color:var(--purple); background:#1a1530;
+                            box-shadow:0 0 0 2px rgba(204,93,232,0.22); }
+    .mode-option-icon     { font-size:22px; line-height:1; flex-shrink:0; padding-top:2px; }
+    .mode-option-title    { font-size:13px; font-weight:bold; color:var(--text); margin-bottom:3px; }
+    .mode-option-desc     { font-size:10px; color:var(--muted); line-height:1.55; }
+    #mode-dialog-actions  { display:flex; gap:8px; margin-top:12px; }
   </style>
 </head>
 <body>
@@ -150,6 +289,7 @@
 <header>
   <h1>🎙️ Live Interpreter
     <span style="font-size:10px;color:var(--muted);font-weight:normal"> V4 · Claude</span>
+    <span class="mode-badge" style="font-size:11px;color:var(--purple);font-weight:normal;margin-left:6px;">🎤 セミナーモード</span>
   </h1>
   <button id="setup-toggle" onclick="toggleSetup()">⚙️ 設定</button>
 </header>
@@ -174,6 +314,21 @@
       <option value="zh">🇨🇳 中国語固定</option>
       <option value="auto">🌐 自動検出</option>
     </select>
+  </div>
+  <!-- V4.1: モード選択（会話 / セミナー） -->
+  <div class="setup-row">
+    <span class="setup-label">🎛 モード</span>
+    <div style="flex:1;display:flex;gap:10px;align-items:center;font-size:12px;color:var(--text);flex-wrap:wrap;padding-top:6px;">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+        <input type="radio" name="mode-radio" value="seminar" onchange="onModeRadioChange(this)" checked>
+        🎤 セミナー
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+        <input type="radio" name="mode-radio" value="conversation" onchange="onModeRadioChange(this)">
+        💬 会話
+      </label>
+      <span class="mode-badge" style="font-size:10px;color:var(--purple);margin-left:auto;">🎤 セミナーモード</span>
+    </div>
   </div>
   <div class="setup-row">
     <span class="setup-label">📋 背景情報</span>
@@ -220,6 +375,19 @@
         </span>
       </div>
     </div>
+    <!-- V4.1: 会話モード専用コンテナ（body.conv-mode のとき表示） -->
+    <div id="conv-container">
+      <div id="conv-speakers"></div>
+      <div id="conv-messages">
+        <div id="conv-ph">会話モード開始後、話者ごとに吹き出しで表示されます<br>
+          <span style="font-size:10px;opacity:.5">日本語=あなた（右）／ 相手=言語に応じて色分け（左）</span>
+        </div>
+      </div>
+      <div id="conv-rec-inline">
+        <span id="conv-rec-icon" style="font-size:12px;">⏸</span>
+        <span id="conv-rec-text">「▶ 開始」で録音開始してください</span>
+      </div>
+    </div>
   </div>
 
   <div id="tab-summary" class="tab-pane">
@@ -251,6 +419,35 @@
   </div>
 </div>
 
+<!-- V4.1: モード選択ダイアログ -->
+<div id="mode-dialog">
+  <div id="mode-dialog-inner">
+    <div id="mode-dialog-title">🎤 セッションのモードを選択</div>
+    <div id="mode-dialog-desc">
+      用途に合わせてモードを選ぶと、翻訳の反応速度・チャンク長・文脈量・要約の有無が自動調整されます。<br>
+      ※ 途中で設定パネルから切替できます。
+    </div>
+    <div class="mode-option" data-mode="seminar" onclick="selectModeInDialog('seminar')">
+      <div class="mode-option-icon">🎤</div>
+      <div>
+        <div class="mode-option-title">セミナーモード</div>
+        <div class="mode-option-desc">講演・プレゼン・長尺スピーチ向け。文脈を厚く取って高精度に翻訳し、90秒ごとに全体像まとめを生成。</div>
+      </div>
+    </div>
+    <div class="mode-option" data-mode="conversation" onclick="selectModeInDialog('conversation')">
+      <div class="mode-option-icon">💬</div>
+      <div>
+        <div class="mode-option-title">会話モード</div>
+        <div class="mode-option-desc">打合せ・雑談・短い掛け合い向け。短い発話も即座に翻訳、反応速度優先。要約は停止。</div>
+      </div>
+    </div>
+    <div id="mode-dialog-actions">
+      <button class="btn d" style="flex:1" onclick="closeModeDialog()">キャンセル</button>
+      <button class="btn g" style="flex:1" onclick="confirmModeDialog()">決定</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -273,6 +470,15 @@ var lastInterim   = '';     // iOSのinterim救済用（Web Speech APIモード�
 var pendingJpQueue = [];    // 翻訳結果の表示待ちキュー（順番に1文字ずつ表示）
 var isTyping       = false; // タイプライターアニメーション実行中フラグ
 var typingTimer    = null;  // タイプライタータイマー
+
+// V4.1: 会話モード state
+// 話者は言語別に自動判別：ja=me / en=sp-a / zh=sp-b / その他=sp-c
+var convSpeakers = {};       // {me: {lang:'ja', label:'あなた', cls:'me', flag:'🇯🇵'}, sp-a: {...}}
+var convMessages = [];       // [{id, speakerId, lang, source, trans, timeStr, lagSec}]
+var convMsgSeq   = 0;        // メッセージID採番
+var pendingConvMsg = null;   // 翻訳中の暫定カード（typing）
+var activeConvSpeakerId = null;    // V4.1: 現在アクティブな話者ID（最新発話者）
+var convRecognizingId  = null;     // V4.1: 認識中の暫定カードID
 
 // Groqモード（MediaRecorder + Whisper Large v3 Turbo）
 var mediaStream    = null;  // マイクストリーム（セッション中保持・再利用）
@@ -308,28 +514,102 @@ var modalContent  = '';
 var modalName     = '';
 
 // ─── 定数 ───────────────────────────────────
-var PAUSE_MS        = 2500;   // 無音停止までの時間（Web Speech APIモード）
-var CHUNK_MAX       = 10000;  // 強制リスタートまでの最大時間（Web Speech APIモード）
-// ── 翻訳タイミング ──────────────────────────────────────────────────
-// センテンス境界まで待ってから翻訳するため、語数・時間の閾値を低めに設定し遅延を5秒程度に抑える
-var MIN_WAIT_MS     = 1500;   // 翻訳間隔の最小値（V3: 2000→1500、PC版と統一）
-var FORCE_MS        = 9000;   // 強制翻訳タイムアウト（9秒、センテンス境界がなくても翻訳）
-var MIN_WORDS       = 7;      // 翻訳開始の最小新規語数（センテンス境界待ちと組み合わせ）
-var MIN_WORDS_COLDSTART = 12; // 冒頭：初回翻訳の語数閾値（V3: PC版と統一・冒頭は文脈を厚めに）
-var CONTEXT_WORDS       = 800;    // 翻訳プロンプトへ送る英語コンテキスト語数（V3: PC版 CONTEXT_WORDS と統一）
-// ── 多言語対応（V4: 中国語追加）──
-// CJK文字（中国語漢字範囲、日本語漢字もカバー）を含む場合、語数判定を文字数ベースに切替
-var CJK_REGEX              = /[\u4E00-\u9FFF]/; // 主に中国語漢字
-var MIN_CHARS_CJK          = 15;   // 中国語のとき: 15文字以上で翻訳対象
-var MIN_CHARS_COLDSTART_CJK = 25;  // 中国語の初回: 25文字以上
-var CONTEXT_CHARS_CJK      = 1600; // 中国語の文脈文字数（英語 800語に相当する情報量）
-var GROQ_CHUNK_MS        = 5000;  // Groqモード: 1チャンクの録音時間(ms)
-var GROQ_FIRST_CHUNK_MS  = 3000;  // Groqモード: 初回チャンクは短くして最初の文字起こしを早める
-var isFirstChunk         = true;  // 初回チャンクフラグ
-var TYPEWRITER_MS   = 28;     // タイプライター: 通常速度(ms/文字)
-var TYPEWRITER_FAST_MS = 12;  // タイプライター: キュー溜まり時の高速表示(ms/文字)
-var SUMMARY_INTERVAL_MS  = 90000;
-var SUMMARY_MIN_WORDS = 30;
+// ── V4.1: モード別パラメータ（セミナー / 会話） ──
+// 起動時にダイアログで選択したモードのパラメータが applyModeParams() で適用される
+var MODE_PARAMS = {
+  seminar: {
+    PAUSE_MS: 2500,
+    CHUNK_MAX: 10000,
+    MIN_WAIT_MS: 1500,
+    FORCE_MS: 9000,
+    MIN_WORDS: 7,
+    MIN_WORDS_COLDSTART: 12,
+    CONTEXT_WORDS: 800,
+    MIN_CHARS_CJK: 15,
+    MIN_CHARS_COLDSTART_CJK: 25,
+    CONTEXT_CHARS_CJK: 1600,
+    GROQ_CHUNK_MS: 5000,
+    GROQ_FIRST_CHUNK_MS: 3000,
+    SUMMARY_INTERVAL_MS: 90000,
+    SUMMARY_ENABLED: true,
+    LABEL: '🎤 セミナーモード'
+  },
+  conversation: {
+    PAUSE_MS: 1200,
+    CHUNK_MAX: 5000,
+    MIN_WAIT_MS: 600,
+    FORCE_MS: 3500,
+    MIN_WORDS: 3,
+    MIN_WORDS_COLDSTART: 5,
+    CONTEXT_WORDS: 150,
+    MIN_CHARS_CJK: 8,
+    MIN_CHARS_COLDSTART_CJK: 12,
+    CONTEXT_CHARS_CJK: 300,
+    GROQ_CHUNK_MS: 2500,
+    GROQ_FIRST_CHUNK_MS: 1500,
+    SUMMARY_INTERVAL_MS: 0,
+    SUMMARY_ENABLED: false,
+    LABEL: '💬 会話モード'
+  }
+};
+var currentMode = 'seminar';
+var modeConfirmed = false;
+
+// V4.1: 以下は let 相当（再代入可能）でモードに応じて applyModeParams() で上書き
+var PAUSE_MS              = MODE_PARAMS.seminar.PAUSE_MS;
+var CHUNK_MAX             = MODE_PARAMS.seminar.CHUNK_MAX;
+var MIN_WAIT_MS           = MODE_PARAMS.seminar.MIN_WAIT_MS;
+var FORCE_MS              = MODE_PARAMS.seminar.FORCE_MS;
+var MIN_WORDS             = MODE_PARAMS.seminar.MIN_WORDS;
+var MIN_WORDS_COLDSTART   = MODE_PARAMS.seminar.MIN_WORDS_COLDSTART;
+var CONTEXT_WORDS         = MODE_PARAMS.seminar.CONTEXT_WORDS;
+// CJK 定数（V4）
+var CJK_REGEX             = /[\u4E00-\u9FFF]/;
+var MIN_CHARS_CJK         = MODE_PARAMS.seminar.MIN_CHARS_CJK;
+var MIN_CHARS_COLDSTART_CJK = MODE_PARAMS.seminar.MIN_CHARS_COLDSTART_CJK;
+var CONTEXT_CHARS_CJK     = MODE_PARAMS.seminar.CONTEXT_CHARS_CJK;
+var GROQ_CHUNK_MS         = MODE_PARAMS.seminar.GROQ_CHUNK_MS;
+var GROQ_FIRST_CHUNK_MS   = MODE_PARAMS.seminar.GROQ_FIRST_CHUNK_MS;
+var SUMMARY_INTERVAL_MS   = MODE_PARAMS.seminar.SUMMARY_INTERVAL_MS;
+var SUMMARY_ENABLED       = MODE_PARAMS.seminar.SUMMARY_ENABLED;
+var isFirstChunk          = true;
+var TYPEWRITER_MS         = 28;
+var TYPEWRITER_FAST_MS    = 12;
+var SUMMARY_MIN_WORDS     = 30;
+
+// V4.1: モードパラメータを現在の変数に適用（UI バッジも更新）
+function applyModeParams(mode) {
+  var p = MODE_PARAMS[mode] || MODE_PARAMS.seminar;
+  PAUSE_MS                = p.PAUSE_MS;
+  CHUNK_MAX               = p.CHUNK_MAX;
+  MIN_WAIT_MS             = p.MIN_WAIT_MS;
+  FORCE_MS                = p.FORCE_MS;
+  MIN_WORDS               = p.MIN_WORDS;
+  MIN_WORDS_COLDSTART     = p.MIN_WORDS_COLDSTART;
+  CONTEXT_WORDS           = p.CONTEXT_WORDS;
+  MIN_CHARS_CJK           = p.MIN_CHARS_CJK;
+  MIN_CHARS_COLDSTART_CJK = p.MIN_CHARS_COLDSTART_CJK;
+  CONTEXT_CHARS_CJK       = p.CONTEXT_CHARS_CJK;
+  GROQ_CHUNK_MS           = p.GROQ_CHUNK_MS;
+  GROQ_FIRST_CHUNK_MS     = p.GROQ_FIRST_CHUNK_MS;
+  SUMMARY_INTERVAL_MS     = p.SUMMARY_INTERVAL_MS;
+  SUMMARY_ENABLED         = p.SUMMARY_ENABLED;
+  currentMode = mode;
+  // UI バッジ更新（ヘッダー脇／設定パネル）
+  var badges = document.querySelectorAll('.mode-badge');
+  badges.forEach(function(b){ b.textContent = p.LABEL; });
+  // 設定パネルのラジオ同期
+  var radios = document.querySelectorAll('input[name="mode-radio"]');
+  radios.forEach(function(r){ r.checked = (r.value === mode); });
+  // V4.1: 会話モードは body に conv-mode クラスを付与して UI を切替
+  if (mode === 'conversation') {
+    document.body.classList.add('conv-mode');
+    renderConvSpeakers();
+  } else {
+    document.body.classList.remove('conv-mode');
+  }
+  console.log('[mode] applied:', mode, p);
+}
 
 // ─── 初期化 ─────────────────────────────────
 (function() {
@@ -343,8 +623,57 @@ var SUMMARY_MIN_WORDS = 30;
   var lang = localStorage.getItem('input_lang') || 'en';
   var langSel = document.getElementById('input-lang-select');
   if (langSel) Array.prototype.forEach.call(langSel.options, function(o){ o.selected = (o.value === lang); });
+  // V4.1: 前回選択したモードを適用（保存は一時的、起動時ダイアログの初期選択に使う）
+  var savedMode = localStorage.getItem('session_mode') || 'seminar';
+  if (MODE_PARAMS[savedMode]) applyModeParams(savedMode);
   if (k) document.getElementById('setup-panel').style.display = 'none';
 })();
+
+// ============================================================
+// V4.1: モード選択ダイアログ制御
+// ============================================================
+var _modeDialogResolver = null;
+var _modeDialogTempChoice = null;
+
+function showModeDialog() {
+  var initial = localStorage.getItem('session_mode') || currentMode || 'seminar';
+  _modeDialogTempChoice = MODE_PARAMS[initial] ? initial : 'seminar';
+  var opts = document.querySelectorAll('#mode-dialog .mode-option');
+  opts.forEach(function(el) {
+    el.classList.toggle('chosen', el.getAttribute('data-mode') === _modeDialogTempChoice);
+  });
+  document.getElementById('mode-dialog').classList.add('open');
+  return new Promise(function(resolve) { _modeDialogResolver = resolve; });
+}
+function selectModeInDialog(mode) {
+  if (!MODE_PARAMS[mode]) return;
+  _modeDialogTempChoice = mode;
+  var opts = document.querySelectorAll('#mode-dialog .mode-option');
+  opts.forEach(function(el) { el.classList.toggle('chosen', el.getAttribute('data-mode') === mode); });
+}
+function confirmModeDialog() {
+  var mode = _modeDialogTempChoice || 'seminar';
+  applyModeParams(mode);
+  localStorage.setItem('session_mode', mode);
+  modeConfirmed = true;
+  document.getElementById('mode-dialog').classList.remove('open');
+  if (_modeDialogResolver) { _modeDialogResolver(mode); _modeDialogResolver = null; }
+}
+function closeModeDialog() {
+  document.getElementById('mode-dialog').classList.remove('open');
+  if (_modeDialogResolver) { _modeDialogResolver(null); _modeDialogResolver = null; }
+}
+function ensureModeSelected() {
+  if (modeConfirmed) return Promise.resolve(currentMode);
+  return showModeDialog();
+}
+// 設定パネル内ラジオからの変更
+function onModeRadioChange(el) {
+  if (!el || !el.value) return;
+  applyModeParams(el.value);
+  localStorage.setItem('session_mode', el.value);
+  modeConfirmed = true;  // 明示的にラジオで選んだ → ダイアログ省略可
+}
 
 // ─── UI ─────────────────────────────────────
 function toggleSetup() {
@@ -465,6 +794,171 @@ function renderJpDisplay(stable, typing) {
   bottom.scrollTop=bottom.scrollHeight;
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
+
+// ─── V4.1: 会話モード 話者管理・メッセージ描画 ────────
+// 言語→話者ID の対応：ja=me / en=sp-a / zh=sp-b / その他=sp-c
+var CONV_LANG_TO_SPEAKER = {
+  'ja': { id:'me',   cls:'me',   label:'あなた',   flag:'🇯🇵' },
+  'en': { id:'sp-a', cls:'sp-a', label:'相手 A', flag:'🇺🇸' },
+  'zh': { id:'sp-b', cls:'sp-b', label:'相手 B', flag:'🇨🇳' }
+};
+function resolveSpeaker(lang) {
+  var key = (lang||'').toLowerCase().slice(0,2);
+  if (CONV_LANG_TO_SPEAKER[key]) return CONV_LANG_TO_SPEAKER[key];
+  // 未知言語は sp-c に割り当て（ラベルに言語コードを付与）
+  return { id:'sp-c', cls:'sp-c', label:'相手 ('+key.toUpperCase()+')', flag:'🌐' };
+}
+function registerSpeaker(lang) {
+  var sp = resolveSpeaker(lang);
+  if (!convSpeakers[sp.id]) {
+    convSpeakers[sp.id] = { lang:lang, label:sp.label, cls:sp.cls, flag:sp.flag };
+    renderConvSpeakers();
+  }
+  return sp;
+}
+function renderConvSpeakers() {
+  var el = document.getElementById('conv-speakers'); if (!el) return;
+  var ids = Object.keys(convSpeakers);
+  if (ids.length === 0) {
+    // V4.1: 録音中なら検出待ち表示、そうでなければプレースホルダー
+    el.innerHTML = isOn
+      ? '<span style="color:var(--muted);font-size:10px">話者: 検出待ち…</span>'
+      : '<span style="color:var(--muted);font-size:10px">話者: 録音開始で検出されます</span>';
+    return;
+  }
+  // me を先頭に
+  ids.sort(function(a,b){ if(a==='me')return -1; if(b==='me')return 1; return a<b?-1:1; });
+  el.innerHTML = ids.map(function(id) {
+    var s = convSpeakers[id];
+    var activeCls = (id === activeConvSpeakerId) ? ' active' : '';
+    var speakingIcon = (id === activeConvSpeakerId) ? '<span class="speaking-ind">●</span>' : '<span class="speaker-dot"></span>';
+    return '<span class="speaker-chip '+s.cls+activeCls+'">'
+         + speakingIcon
+         + esc(s.label) + '（' + s.flag + '）'
+         + '</span>';
+  }).join('');
+}
+// V4.1: アクティブ話者を設定（最新発話者を光らせる）
+function setActiveSpeaker(id) {
+  activeConvSpeakerId = id;
+  renderConvSpeakers();
+  // 3秒後に解除（新しい発話がなければ消灯）
+  if (setActiveSpeaker._t) clearTimeout(setActiveSpeaker._t);
+  setActiveSpeaker._t = setTimeout(function() {
+    activeConvSpeakerId = null;
+    renderConvSpeakers();
+  }, 3000);
+}
+function addConvMessage(item) {
+  // item: {speakerId, cls, label, flag, lang, source, trans, lagSec}
+  var msgs = document.getElementById('conv-messages'); if (!msgs) return;
+  var ph = document.getElementById('conv-ph'); if (ph) ph.remove();
+  convMsgSeq++;
+  var id = 'conv-msg-' + convMsgSeq;
+  var isMe = (item.speakerId === 'me');
+  var timeStr = item.timeStr || new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var langTag = isMe ? '🇯🇵 JA' : (item.flag + ' ' + (item.lang||'').toUpperCase() + ' → 🇯🇵');
+  var avatar  = '<span class="msg-avatar '+item.cls+'">'+esc(item.avatarText||(isMe?'Me':'?'))+'</span>';
+  var metaParts = isMe
+    ? ['<span>'+esc(item.label)+'</span>', '<span class="lang">'+langTag+'</span>', '<span>'+timeStr+'</span>', avatar]
+    : [avatar, '<span>'+esc(item.label)+'</span>', '<span class="lang">'+langTag+'</span>', '<span>'+timeStr+'</span>'];
+  var body = isMe
+    ? '<div class="msg-trans">'+esc(item.source||'')+'</div>'
+    : (
+        (item.source ? '<div class="msg-source">'+esc(item.source)+'</div>' : '')
+      + (item.trans  ? '<div class="msg-trans">'+esc(item.trans)+'</div>'   : '<div class="msg-trans"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>')
+      );
+  var tail = (item.lagSec!=null && !isMe) ? '<div class="msg-tail"><span>⏱ '+Number(item.lagSec).toFixed(1)+'s</span></div>' : '';
+  var html = ''
+    + '<div class="msg-group '+(isMe?'me':'other')+'" id="'+id+'">'
+    +   '<div class="msg-meta">' + metaParts.join('') + '</div>'
+    +   '<div class="msg-bubble '+item.cls+(item.typing?' typing':'')+'">' + body + '</div>'
+    +   tail
+    + '</div>';
+  msgs.insertAdjacentHTML('beforeend', html);
+  requestAnimationFrame(function(){ msgs.scrollTop = msgs.scrollHeight; });
+  convMessages.push({ id:id, speakerId:item.speakerId, lang:item.lang, source:item.source, trans:item.trans, timeStr:timeStr, lagSec:item.lagSec });
+  return id;
+}
+function updateConvMessage(id, patch) {
+  var el = document.getElementById(id); if (!el) return;
+  var bubble = el.querySelector('.msg-bubble');
+  if (!bubble) return;
+  bubble.classList.remove('typing');
+  var transEl = bubble.querySelector('.msg-trans');
+  if (patch.trans && transEl) transEl.innerHTML = esc(patch.trans);
+  if (patch.lagSec != null) {
+    var tail = el.querySelector('.msg-tail');
+    if (!tail) {
+      tail = document.createElement('div'); tail.className = 'msg-tail';
+      el.appendChild(tail);
+    }
+    tail.innerHTML = '<span>⏱ '+Number(patch.lagSec).toFixed(1)+'s</span>';
+  }
+  // 状態配列にも反映
+  for (var i=convMessages.length-1; i>=0; i--) {
+    if (convMessages[i].id===id) {
+      if (patch.trans!=null) convMessages[i].trans = patch.trans;
+      if (patch.lagSec!=null) convMessages[i].lagSec = patch.lagSec;
+      break;
+    }
+  }
+}
+function clearConvMessages() {
+  convMessages = []; convMsgSeq = 0; pendingConvMsg = null; convSpeakers = {};
+  activeConvSpeakerId = null; convRecognizingId = null;
+  var msgs = document.getElementById('conv-messages');
+  if (msgs) msgs.innerHTML = '<div id="conv-ph">会話モード開始後、話者ごとに吹き出しで表示されます<br><span style="font-size:10px;opacity:.5">日本語=あなた（右）／ 相手=言語に応じて色分け（左）</span></div>';
+  renderConvSpeakers();
+  updateConvRecInline(false);
+}
+
+// V4.1: 会話画面下部の録音状態インジケータ
+function updateConvRecInline(recording) {
+  var el = document.getElementById('conv-rec-inline');
+  if (!el) return;
+  var icon = document.getElementById('conv-rec-icon');
+  var text = document.getElementById('conv-rec-text');
+  if (recording) {
+    el.classList.add('recording');
+    if (icon) icon.outerHTML = '<span id="conv-rec-icon" class="rec-dot"></span>';
+    if (text) text.innerHTML = '🎙 録音中... <span class="rec-wave"><span></span><span></span><span></span><span></span><span></span></span> 話すと自動で話者が判別されます';
+  } else {
+    el.classList.remove('recording');
+    var existingIcon = document.getElementById('conv-rec-icon');
+    if (existingIcon) existingIcon.outerHTML = '<span id="conv-rec-icon" style="font-size:12px;">⏸</span>';
+    if (text) text.textContent = '「▶ 開始」で録音開始してください';
+  }
+}
+
+// V4.1: 認識中（Whisper 処理中）の暫定カード — チャンク録音完了→結果到着までの間表示
+function addRecognizingCard() {
+  if (convRecognizingId) return; // 既に存在
+  var msgs = document.getElementById('conv-messages'); if (!msgs) return;
+  var ph = document.getElementById('conv-ph'); if (ph) ph.remove();
+  convMsgSeq++;
+  var id = 'conv-msg-' + convMsgSeq;
+  convRecognizingId = id;
+  var html = ''
+    + '<div class="msg-group other" id="'+id+'">'
+    +   '<div class="msg-meta">'
+    +     '<span class="msg-avatar" style="background:#0d1020;color:var(--accent);border-color:#4dabf7aa">?</span>'
+    +     '<span>認識中…</span>'
+    +     '<span class="lang">🔄 処理中</span>'
+    +   '</div>'
+    +   '<div class="msg-bubble recognizing">'
+    +     '<div class="msg-trans"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span> 音声を解析しています</div>'
+    +   '</div>'
+    + '</div>';
+  msgs.insertAdjacentHTML('beforeend', html);
+  requestAnimationFrame(function(){ msgs.scrollTop = msgs.scrollHeight; });
+}
+function removeRecognizingCard() {
+  if (!convRecognizingId) return;
+  var el = document.getElementById(convRecognizingId);
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+  convRecognizingId = null;
+}
 
 // ─── タイプライター表示キュー（v2.34）─────────────────────
 // 翻訳されたテキストを1文字ずつ表示。キューに積んで順番に処理。
@@ -589,6 +1083,8 @@ function recordChunk(stream) {
       var blob = new Blob(audioChunks, {type:mime});
       audioChunks = [];
       groqQueue.push({blob:blob, mime:mime, chunkStart:chunkRecordStart});
+      // V4.1: 会話モードでは認識中カードを暫定表示（Whisper処理中を視覚化）
+      if (currentMode === 'conversation' && !convRecognizingId) addRecognizingCard();
       flushGroqQueue();
     }
     // ギャップレス: 即座に次チャンク録音開始
@@ -655,28 +1151,31 @@ function isHallucination(text) {
 }
 
 // キューに溜まった音声Blobを順番にGroq APIへ送信（1件ずつ直列処理）
+// V4.1: {text, language} を受け取り、モードに応じて分岐
 function flushGroqQueue() {
   if(groqProcessing||groqQueue.length===0) return;
   groqProcessing=true;
   var item=groqQueue.shift();
   sendToGroq(item.blob, item.mime)
-  .then(function(text) {
+  .then(function(result) {
     groqProcessing=false;
+    var text = (result && result.text) || '';
+    var language = (result && result.language) || 'en';
     if(text&&text.trim()&&isOn) {
-      // ハリュシネーション除外（無音/定型フレーズ/直前テキストの繰り返し）
+      // ハリュシネーション除外
       if(isHallucination(text.trim())) {
-        // 静かにスキップ
+        // silent skip — 会話モードの認識中カードはクリア
+        if (currentMode === 'conversation') removeRecognizingCard();
+      } else if (currentMode === 'conversation') {
+        // ── 会話モード: 話者別メッセージに追加 ──
+        handleConvChunk(text.trim(), language, item.chunkStart);
       } else {
-        // 現バッチの最初のチャンク録音開始時刻を speechStartAt にセット
-        // （翻訳後リセットされた後、次に届く最初のチャンクの録音開始時刻が正確な起点）
+        // ── セミナーモード: 既存フロー ──
         if(speechStartAt===0 && item.chunkStart>0) speechStartAt=item.chunkStart;
         fullText+=text.trim()+' ';
         lastSpeechAt=Date.now();
         document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
-        // latestEnEnd により [latestEnStart, latestEnEnd] のみ紫ハイライト（renderTranscript参照）
-        // → fullTextが伸びても旧バッチのハイライトが新テキストに拡張されない
         renderTranscript('');
-        // immediate=false: MIN_WAIT_MS / MIN_WORDS / 文末記号を尊重し、頻発翻訳を抑制
         maybeTranslate(false);
       }
     }
@@ -684,7 +1183,8 @@ function flushGroqQueue() {
   })
   .catch(function(e) {
     groqProcessing=false;
-    // 400: 音声が短すぎ or 無音 → 静かにスキップ
+    // V4.1: 会話モードの認識中カードをクリア
+    if (currentMode === 'conversation') removeRecognizingCard();
     if(e.message&&(e.message.indexOf('400')!==-1||e.message.indexOf('413')!==-1)) {
       // silent skip
     } else {
@@ -694,7 +1194,91 @@ function flushGroqQueue() {
   });
 }
 
-// Groq Whisper APIへ音声送信 → テキストを返す
+// V4.1: 会話モード用チャンクハンドラ
+// 日本語=自分の発話として即時表示（翻訳不要）
+// それ以外=相手として暫定カード追加→Claude翻訳→カード更新
+function handleConvChunk(text, language, chunkStart) {
+  var sp = resolveSpeaker(language);
+  registerSpeaker(language);
+  // V4.1: 認識中カードがあればここでクリア（認識完了＝このチャンクが届いた瞬間）
+  if (convRecognizingId) { removeRecognizingCard(); }
+  // V4.1: 最新話者をアクティブにハイライト
+  setActiveSpeaker(sp.id);
+  var lastSpeechTime = chunkStart || Date.now();
+  lastSpeechAt = Date.now();
+  document.getElementById('s-words').textContent =
+    (parseInt(document.getElementById('s-words').textContent, 10) || 0) + text.split(/\s+/).filter(Boolean).length;
+
+  if (sp.id === 'me') {
+    // 自分の日本語発話: 翻訳不要、即表示
+    addConvMessage({
+      speakerId: sp.id, cls: sp.cls, label: sp.label, flag: sp.flag,
+      lang: 'ja', source: text,
+      avatarText: 'Me',
+      lagSec: null
+    });
+    return;
+  }
+  // 相手: 暫定カード（typing）で追加 → Claude 翻訳 → 完了時に updateConvMessage
+  var avatarText = (sp.id === 'sp-a') ? 'A' : (sp.id === 'sp-b') ? 'B' : 'C';
+  var msgId = addConvMessage({
+    speakerId: sp.id, cls: sp.cls, label: sp.label, flag: sp.flag,
+    lang: language, source: text,
+    avatarText: avatarText,
+    typing: true,
+    trans: null
+  });
+  translateConvChunk(text, language, msgId, lastSpeechTime);
+}
+
+// V4.1: 会話モード用の単発翻訳（チャンク単体を Claude へ）
+function translateConvChunk(text, language, msgId, batchStart) {
+  var key = getKey();
+  if (!key) { showErr('⚠️ Claude API Keyを設定してください'); return; }
+  var ctx = getCtx();
+  var isConv = true;
+  // 直近の会話履歴（最後 6 メッセージ）を文脈として
+  var recentCtx = convMessages.slice(-6).map(function(m){
+    return '['+(m.speakerId==='me'?'自分':'相手')+']'+(m.trans||m.source||'');
+  }).join('\n');
+  var parts = [
+    '同時通訳（会話モード）。[新規翻訳対象]の原文を自然な話し言葉の日本語に訳せ。',
+    '短い発話・相槌・掛け合いを不自然にならないよう訳すこと。',
+    '・音声認識で欠落した助詞・主語は文脈から補う',
+    '・言い淀み・繰り返し（英："I mean", "you know", "um" / 中："那个", "就是" 等）は省略',
+    '【厳守】日本語訳文のみ出力。説明・コメント・前置き絶対禁止。必ず句点（。）で終わること。'
+  ];
+  if (ctx)       parts.push('[背景] ' + ctx);
+  if (recentCtx) parts.push('[直近の会話（訳出禁止）]\n' + recentCtx);
+  parts.push('[新規翻訳対象] ' + text);
+
+  setBadge('b-ai', '🤖 翻訳中…', 'bwait');
+  claudeFetch({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    messages: [{ role:'user', content: parts.join('\n') }]
+  }, 25000, 1)
+  .then(function(data) {
+    var raw = data && data.content && data.content[0] ? data.content[0].text.trim() : '';
+    if (!raw) throw new Error('翻訳結果が空です');
+    var jp = ensureKuten(sanitizeJp(raw));
+    var lag = batchStart ? ((Date.now() - batchStart) / 1000) : null;
+    updateConvMessage(msgId, { trans: jp, lagSec: lag });
+    transCount++;
+    document.getElementById('s-trans').textContent = transCount;
+    if (lag != null) recordLag(parseFloat(lag.toFixed(1)));
+    setBadge('b-ai', '🤖 完了', 'bon');
+  })
+  .catch(function(e) {
+    if (e && e.name !== 'AbortError') {
+      updateConvMessage(msgId, { trans: '⚠️ 翻訳エラー: ' + e.message });
+      setBadge('b-ai', '⚠️ エラー', 'boff');
+    }
+  });
+}
+
+// Groq Whisper APIへ音声送信 → {text, language} を返す
+// V4.1: 会話モードで language が必要なため response_format を verbose_json に変更
 function sendToGroq(blob, mimeType) {
   var key=getGroqKey();
   if(!key) return Promise.reject(new Error('Groq API Keyが設定されていません'));
@@ -704,12 +1288,13 @@ function sendToGroq(blob, mimeType) {
   var formData=new FormData();
   formData.append('file', blob, 'audio.'+ext);
   formData.append('model', 'whisper-large-v3-turbo');
-  // V4: 入力言語に応じて language パラメータを切替（auto は指定なし → Whisper 側自動検出）
-  var il = getInputLang();
+  // V4: 入力言語に応じて language パラメータを切替。
+  // V4.1: 会話モードは必ず auto（自動検出）— 複数話者の言語を識別するため
+  var il = (currentMode === 'conversation') ? 'auto' : getInputLang();
   if (il === 'en')      formData.append('language', 'en');
   else if (il === 'zh') formData.append('language', 'zh');
   // auto は language を付けない（Whisper の自動検出に委ねる）
-  formData.append('response_format', 'text');
+  formData.append('response_format', 'verbose_json');
   // 直前のテキストをpromptとして送ることで語彙・文脈の連続性を維持
   var prompt=fullText.trim().split(/\s+/).filter(Boolean).slice(-50).join(' ');
   if(prompt) formData.append('prompt', prompt);
@@ -719,7 +1304,10 @@ function sendToGroq(blob, mimeType) {
     body:formData
   }).then(function(res) {
     if(!res.ok) return res.text().then(function(t){ throw new Error('Groq '+res.status+': '+t.slice(0,120)); });
-    return res.text();
+    return res.json();
+  }).then(function(data) {
+    // verbose_json は {text, language, duration, segments, ...} を返す
+    return { text: (data && data.text) || '', language: (data && data.language) || 'en' };
   });
 }
 
@@ -743,12 +1331,20 @@ function buildRecognition() {
     if((interim.trim()||finals.trim()) && speechStartAt===0) speechStartAt=Date.now();
     if(interim.trim()||finals.trim()) { lastSpeechAt=Date.now(); resetChunkTimer(); }
     if(finals.trim()) {
-      // finalが確定したら必ず fullText に追記（絶対に捨てない）
-      lastInterim=''; // finalになったのでinterim救済不要
-      fullText+=finals.trim()+' ';
-      document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
-      renderTranscript(interim);
-      maybeTranslate(true);
+      lastInterim='';
+      if (currentMode === 'conversation') {
+        // V4.1: 会話モード（Web Speech API モード）
+        // r.lang に応じて言語を推定。日本語は認識不可のため相手言語のみ扱う。
+        var il = getInputLang();
+        var lang = (il === 'zh') ? 'zh' : 'en';
+        handleConvChunk(finals.trim(), lang, Date.now());
+      } else {
+        // セミナーモード: finalを fullText に追記して翻訳フローへ
+        fullText+=finals.trim()+' ';
+        document.getElementById('s-words').textContent=fullText.trim().split(/\s+/).filter(Boolean).length;
+        renderTranscript(interim);
+        maybeTranslate(true);
+      }
     } else {
       // interimを保存（セッション終了時にfinalが来なかった場合に備える）
       if(interim.trim()) lastInterim=interim.trim();
@@ -845,6 +1441,13 @@ function startListening() {
   if(!getKey()) { showErr('⚠️ Claude API Keyを設定してください'); toggleSetup(); return; }
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!isGroqMode()&&!SR) { showErr('⚠️ このブラウザは音声認識に対応していません（Groq Keyを設定するか Safari / Chrome を使用）'); return; }
+  // V4.1: モード未確認なら起動時ダイアログを出し、確定したら録音開始（キャンセルなら中止）
+  ensureModeSelected().then(function(chosen) {
+    if (!chosen) return;
+    _startListeningInner();
+  });
+}
+function _startListeningInner() {
   isOn=true; lastTransAt=Date.now(); speechStartAt=0; isForcedStop=false; lastInterim='';
   isFirstChunk=true;  // 初回チャンクは短い録音時間を使う
   if(isGroqMode()) {
@@ -864,10 +1467,20 @@ function startListening() {
   updateBtns(true);
   document.getElementById('setup-panel').style.display='none';
   startMeter(); startSummaryTimer();
+  // V4.1: 会話モードなら画面下部のインジケータを「録音中」に
+  if (currentMode === 'conversation') {
+    updateConvRecInline(true);
+    renderConvSpeakers();  // 「検出待ち…」表示に切替
+  }
 }
 function stopListening() {
   isOn=false;
   lastInterim='';
+  // V4.1: 会話モード画面の録音状態を「停止」に
+  if (currentMode === 'conversation') {
+    updateConvRecInline(false);
+    removeRecognizingCard();
+  }
   // Web Speech API 停止
   clearTimeout(chunkTimer); clearTimeout(chunkMaxTimer);
   if(recognition) { try{recognition.stop();}catch(e){} recognition=null; }
@@ -996,11 +1609,21 @@ function doTranslate() {
   lastTransAt=Date.now();
   setBadge('b-ai','🤖 翻訳中…','bwait');
 
-  // V4: 英中共通のプロンプト。言語中立の表現（「英語」→「原文」）＋中国語の言い淀み例も付与。
+  // V4: 英中共通のプロンプト。言語中立（「英語」→「原文」）。
+  // V4.1: 会話モードではカジュアルな話し言葉向けの指示に差し替え。
+  var isConv = (currentMode === 'conversation');
   var parts;
   if(revisionTail) {
     // 強制翻訳（センテンス境界なし）: 末尾1文リビジョンあり
-    parts=[
+    parts = isConv ? [
+      '同時通訳（会話モード）。[新規翻訳対象]の原文を自然な話し言葉の日本語に訳せ。',
+      '短い発話・相槌・掛け合いを不自然にならないよう訳すこと。',
+      '・音声認識で欠落した助詞・主語は文脈から補う',
+      '・言い淀み・繰り返し（英："I mean", "you know", "um" / 中："那个", "就是" 等）は省略',
+      '[直前の日本語訳末尾]の最後の1文のみ必要なら小修正してよい（大幅変更・削除禁止）。修正不要なら原文のまま出力。',
+      '[文脈原文]は理解のみ・訳出禁止。',
+      '【厳守】出力は「（修正後または原文のまま[直前の日本語訳末尾]）＋（新訳）」のみ。説明・コメント絶対禁止。必ず句点（。）で終わること。'
+    ] : [
       '同時通訳。[新規翻訳対象]の原文を日本語に訳せ。',
       '音声認識で単語・文字の脱落や誤認識が含まれるが、スピーチ全体の文脈から自然な日本語にすること。',
       '・音声認識で欠落した接続詞・助詞・主語は文脈から補う',
@@ -1016,7 +1639,15 @@ function doTranslate() {
     parts.push('[新規翻訳対象] '+translateEn);
   } else {
     // センテンス境界あり: シンプルな新規翻訳のみ
-    parts=[
+    parts = isConv ? [
+      '同時通訳（会話モード）。[新規翻訳対象]の原文のみを自然な話し言葉の日本語に訳せ。',
+      '短い発話・相槌・掛け合いを不自然にならないよう訳すこと。',
+      '・音声認識で欠落した助詞・主語は文脈から補う',
+      '・言い淀み・繰り返し（英："I mean", "you know", "um" / 中："那个", "就是" 等）は省略',
+      '[これまでの日本語訳]の文体・トーンを引き継ぐこと。',
+      '[文脈原文]は理解のみ・訳出禁止。',
+      '【厳守】日本語訳文のみ出力。説明・コメント・前置き絶対禁止。必ず句点（。）で終わること。'
+    ] : [
       '同時通訳。[新規翻訳対象]の原文のみを日本語に訳せ。',
       '音声認識で単語・文字の脱落や誤認識が含まれるが、スピーチ全体の文脈から自然な日本語にすること。',
       '・音声認識で欠落した接続詞・助詞・主語は文脈から補う',
@@ -1160,7 +1791,14 @@ function updateSumCd() {
   el.textContent='次の要約まで '+Math.floor(r/60)+':'+String(r%60).padStart(2,'0');
 }
 function startSummaryTimer() {
-  stopSummaryTimer(); summaryNextAt=Date.now()+SUMMARY_INTERVAL_MS;
+  stopSummaryTimer();
+  // V4.1: 会話モード（SUMMARY_ENABLED=false）では要約タイマーを起動しない
+  if (!SUMMARY_ENABLED || !SUMMARY_INTERVAL_MS) {
+    var el=document.getElementById('sum-cd');
+    if (el) el.textContent = '（会話モード: 要約停止中）';
+    return;
+  }
+  summaryNextAt=Date.now()+SUMMARY_INTERVAL_MS;
   (function tick(){
     summaryTimer=setTimeout(function(){
       generateSummary(false).then(function(){ if(isOn){summaryNextAt=Date.now()+SUMMARY_INTERVAL_MS;tick();} });
@@ -1377,6 +2015,8 @@ function clearAll() {
   if(mediaStream){mediaStream.getTracks().forEach(function(t){t.stop();});mediaStream=null;}
   groqQueue=[]; groqProcessing=false;
   summaryPos=0; summaryCount=0; summaryBusy=false;
+  // V4.1: 会話モードのメッセージ・話者もリセット
+  clearConvMessages();
   clearInterval(elapsedLoop); stopSummaryTimer();
   document.getElementById('transcript-committed').textContent='（英語音声をここに表示）';
   document.getElementById('transcript-committed').style.color='#555';
