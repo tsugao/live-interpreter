@@ -933,7 +933,8 @@ function recordChunk(stream) {
       audioChunks = [];
       groqQueue.push({blob:blob, mime:mime, chunkStart:chunkRecordStart});
       // V4.1: 会話モードでは認識中カードを暫定表示（Whisper処理中を視覚化）
-      if (currentMode === 'conversation' && !convRecognizingId) addRecognizingCard();
+      // 停止中（isOn=false）はカードを追加しない
+      if (currentMode === 'conversation' && isOn && !convRecognizingId) addRecognizingCard();
       flushGroqQueue();
     }
     // ギャップレス: 即座に次チャンク録音開始
@@ -1010,11 +1011,12 @@ function flushGroqQueue() {
     groqProcessing=false;
     var text = (result && result.text) || '';
     var language = (result && result.language) || 'en';
+    // V4.1: 会話モードは結果到着で必ず認識中カードをクリア（停止中・空テキスト・ハリュシネーション問わず）
+    if (currentMode === 'conversation') removeRecognizingCard();
     if(text&&text.trim()&&isOn) {
       // ハリュシネーション除外
       if(isHallucination(text.trim())) {
-        // silent skip — 会話モードの認識中カードはクリア
-        if (currentMode === 'conversation') removeRecognizingCard();
+        // silent skip
       } else if (currentMode === 'conversation') {
         // ── 会話モード: 話者別メッセージに追加 ──
         handleConvChunk(text.trim(), language, item.chunkStart);
