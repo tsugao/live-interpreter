@@ -143,95 +143,40 @@
     .p { background:var(--purple); color:#fff; font-size:12px; padding:10px 14px; }
     ::-webkit-scrollbar { width:3px; }
     ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
-    /* V4.1: 会話モード UI（1言語・複数話者・手動切替・聞き専） */
-    :root {
-      /* A/B/C/D の4階調（同言語内の話者識別用） */
-      --sp-a-bg:#2a143a;  --sp-a-border:#cc5de8;  --sp-a-fg:#e8d0ff; /* 紫 */
-      --sp-b-bg:#1a2340;  --sp-b-border:#4dabf7;  --sp-b-fg:#bfdbfe; /* 青 */
-      --sp-c-bg:#0f2a24;  --sp-c-border:#20c997;  --sp-c-fg:#a8e6d0; /* ティール */
-      --sp-d-bg:#2a1f0a;  --sp-d-border:#fab005;  --sp-d-fg:#ffe8a8; /* 黄 */
-    }
+    /* V4.1: 会話モード UI（ブロック型・話者識別なし・指定言語のみ翻訳） */
     /* 会話モード時の切替: セミナー用UIを隠し、会話用コンテナを表示 */
     body.conv-mode #split-top,
     body.conv-mode #split-divider,
     body.conv-mode #split-bottom { display:none; }
     body.conv-mode #conv-container { display:flex; }
     #conv-container { display:none; flex:1; min-height:0; flex-direction:column; }
-    #conv-speakers  { background:var(--panel2); border-bottom:1px solid var(--border);
-                      padding:7px 13px; display:flex; gap:6px; align-items:center;
-                      flex-shrink:0; font-size:11px; overflow-x:auto; }
-    #conv-speakers-label { font-size:10px; color:var(--muted); margin-right:4px;
-                           white-space:nowrap; flex-shrink:0; }
-    .speaker-chip   { display:flex; align-items:center; gap:5px; padding:5px 11px;
-                      border-radius:14px; font-size:12px; white-space:nowrap;
-                      border:1px solid; flex-shrink:0; cursor:pointer;
-                      background:#0d1020; color:var(--muted); border-color:var(--border);
-                      font-weight:600; transition:filter .15s; }
-    .speaker-chip.a { background:var(--sp-a-bg); color:var(--sp-a-fg); border-color:var(--sp-a-border); }
-    .speaker-chip.b { background:var(--sp-b-bg); color:var(--sp-b-fg); border-color:var(--sp-b-border); }
-    .speaker-chip.c { background:var(--sp-c-bg); color:var(--sp-c-fg); border-color:var(--sp-c-border); }
-    .speaker-chip.d { background:var(--sp-d-bg); color:var(--sp-d-fg); border-color:var(--sp-d-border); }
-    .speaker-chip.active {
-      box-shadow:0 0 0 2px rgba(255,255,255,.25), 0 0 12px currentColor;
-      animation:chip-pulse 1.2s ease-in-out infinite;
-      transform:scale(1.04);
-    }
-    .speaker-chip.inactive { opacity:.55; }
-    @keyframes chip-pulse {
-      0%,100% { filter:brightness(1); }
-      50%     { filter:brightness(1.2); }
-    }
-    .speaker-dot    { width:6px; height:6px; border-radius:50%; background:currentColor; }
-    .speaking-ind   { display:inline-block; width:8px; height:8px; border-radius:50%;
-                      background:currentColor; animation:speak-blink .8s infinite; }
-    @keyframes speak-blink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.7)} }
-    .speaker-add    { background:#0d1020; color:var(--muted); border:1px dashed var(--border);
-                      padding:5px 10px; border-radius:14px; font-size:11px; cursor:pointer;
-                      flex-shrink:0; }
-
     #conv-messages  { flex:1; min-height:0; overflow-y:auto;
                       padding:12px 14px 10px; -webkit-overflow-scrolling:touch;
-                      display:flex; flex-direction:column; gap:12px; }
-    /* 全幅・左寄せのみ（聞き専のため自分の右寄せは廃止） */
-    .msg-group      { display:flex; flex-direction:column; gap:6px; width:100%; }
+                      display:flex; flex-direction:column; gap:10px; }
+    /* 全幅ブロック（チャット風の左右レイアウトはなし） */
+    .msg-group      { display:flex; flex-direction:column; gap:5px; width:100%; }
     .msg-meta       { display:flex; gap:6px; align-items:center; font-size:10px;
                       color:var(--muted); padding:0 4px; }
     .msg-meta .lang { background:#0d1020; border:1px solid var(--border); border-radius:8px;
                       padding:1px 6px; font-size:9px; letter-spacing:.3px; }
-    .msg-avatar     { width:24px; height:24px; border-radius:50%; display:inline-flex;
-                      align-items:center; justify-content:center; font-size:11px;
-                      font-weight:bold; border:1px solid; }
-    .msg-avatar.a { background:var(--sp-a-bg); color:var(--sp-a-fg); border-color:var(--sp-a-border); }
-    .msg-avatar.b { background:var(--sp-b-bg); color:var(--sp-b-fg); border-color:var(--sp-b-border); }
-    .msg-avatar.c { background:var(--sp-c-bg); color:var(--sp-c-fg); border-color:var(--sp-c-border); }
-    .msg-avatar.d { background:var(--sp-d-bg); color:var(--sp-d-fg); border-color:var(--sp-d-border); }
-    .msg-bubble     { border-radius:12px; padding:11px 13px; font-size:14px; line-height:1.7;
-                      border:1px solid; display:flex; flex-direction:column; gap:7px;
-                      word-break:break-word; }
-    .msg-bubble.a { background:var(--sp-a-bg); border-color:#cc5de855; }
-    .msg-bubble.b { background:var(--sp-b-bg); border-color:#4dabf755; }
-    .msg-bubble.c { background:var(--sp-c-bg); border-color:#20c99755; }
-    .msg-bubble.d { background:var(--sp-d-bg); border-color:#fab00555; }
-    .msg-source   { font-size:12px; color:#a0a8c0; line-height:1.55;
-                    border-left:2px solid #2a2d45; padding-left:8px; }
-    .msg-trans    { font-size:14px; line-height:1.8; font-weight:500; }
-    .msg-bubble.a .msg-trans { color:var(--sp-a-fg); }
-    .msg-bubble.b .msg-trans { color:var(--sp-b-fg); }
-    .msg-bubble.c .msg-trans { color:var(--sp-c-fg); }
-    .msg-bubble.d .msg-trans { color:var(--sp-d-fg); }
-    .msg-tail     { font-size:9px; color:var(--muted); padding:0 4px; display:flex; gap:6px; }
-    .msg-bubble.typing,
-    .msg-bubble.recognizing { opacity:.85; border-style:dashed;
-                              background:#0d1020; border-color:#4dabf7aa; }
+    .msg-bubble     { border-radius:10px; padding:10px 13px; font-size:14px; line-height:1.7;
+                      border:1px solid #cc5de855; background:#1f1530;
+                      display:flex; flex-direction:column; gap:6px; word-break:break-word; }
+    .msg-source     { font-size:12px; color:#a0a8c0; line-height:1.55;
+                      border-left:2px solid #2a2d45; padding-left:8px; }
+    .msg-trans      { font-size:14px; line-height:1.8; font-weight:500; color:#e8d0ff; }
+    .msg-tail       { font-size:9px; color:var(--muted); padding:0 4px; display:flex; gap:6px; }
+    /* 認識中（暫定）カード */
+    .msg-bubble.recognizing { background:#0d1020; border-color:#4dabf7aa; border-style:dashed; }
     .msg-bubble.recognizing .msg-trans { color:var(--muted); font-style:italic; }
-    .typing-dot   { display:inline-block; width:5px; height:5px; margin:0 1px;
-                    background:currentColor; border-radius:50%;
-                    animation:blink 1.4s infinite; }
+    .typing-dot     { display:inline-block; width:5px; height:5px; margin:0 1px;
+                      background:currentColor; border-radius:50%;
+                      animation:blink 1.4s infinite; }
     .typing-dot:nth-child(2){animation-delay:.2s}
     .typing-dot:nth-child(3){animation-delay:.4s}
     @keyframes blink { 0%,80%,100%{opacity:.25}40%{opacity:1} }
-    #conv-ph      { color:var(--muted); font-size:12px; text-align:center; padding:40px 16px;
-                    line-height:1.8; }
+    #conv-ph        { color:var(--muted); font-size:12px; text-align:center; padding:40px 16px;
+                      line-height:1.8; }
     /* V4.1: 会話画面下部の録音中インジケータ */
     #conv-rec-inline {
       flex-shrink:0; padding:6px 14px; border-top:1px solid var(--border);
@@ -260,30 +205,21 @@
     #conv-rec-inline .rec-wave span:nth-child(4){animation-delay:.45s; height:60%}
     #conv-rec-inline .rec-wave span:nth-child(5){animation-delay:.6s;  height:30%}
     @keyframes rec-bar { 0%,100%{transform:scaleY(.3)} 50%{transform:scaleY(1)} }
-    /* V4.1: 現在話者ラベル（録音インジケータ右側） */
-    #conv-rec-current { margin-left:auto; display:flex; gap:5px; align-items:center;
-                        font-size:10px; color:var(--muted); flex-shrink:0; }
-    #conv-rec-current b { font-size:11px; }
 
-    /* V4.1: モード選択ダイアログ */
-    #mode-dialog { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:150;
-                   align-items:center; justify-content:center; padding:16px; }
-    #mode-dialog.open { display:flex; }
-    #mode-dialog-inner { background:var(--panel); border:1px solid var(--border); border-radius:14px;
-                         padding:18px; width:100%; max-width:420px;
-                         box-shadow:0 10px 40px rgba(0,0,0,0.6); }
-    #mode-dialog-title { font-size:15px; font-weight:bold; color:var(--accent); margin-bottom:6px; }
-    #mode-dialog-desc  { font-size:11px; color:var(--muted); margin-bottom:14px; line-height:1.6; }
-    .mode-option { display:flex; align-items:flex-start; gap:10px;
-                   background:#0d1020; border:2px solid var(--border); border-radius:10px;
-                   padding:12px; margin-bottom:8px; cursor:pointer; }
-    .mode-option:active   { border-color:var(--purple); background:#1a1530; }
-    .mode-option.chosen   { border-color:var(--purple); background:#1a1530;
-                            box-shadow:0 0 0 2px rgba(204,93,232,0.22); }
-    .mode-option-icon     { font-size:22px; line-height:1; flex-shrink:0; padding-top:2px; }
-    .mode-option-title    { font-size:13px; font-weight:bold; color:var(--text); margin-bottom:3px; }
-    .mode-option-desc     { font-size:10px; color:var(--muted); line-height:1.55; }
-    #mode-dialog-actions  { display:flex; gap:8px; margin-top:12px; }
+    /* V4.1: モード説明ヘルプポップ（？アイコン用） */
+    #mode-help-popup { display:none; position:absolute; z-index:120;
+                       background:var(--panel); border:1px solid var(--border);
+                       border-radius:8px; padding:11px 13px; max-width:280px;
+                       font-size:11px; color:var(--text); line-height:1.55;
+                       box-shadow:0 4px 16px rgba(0,0,0,.5); }
+    #mode-help-popup.open { display:block; }
+    #mode-help-popup .help-mode { font-weight:bold; color:var(--purple); margin-top:6px; }
+    #mode-help-popup .help-mode:first-child { margin-top:0; }
+    .mode-help-icon { display:inline-flex; align-items:center; justify-content:center;
+                      width:16px; height:16px; border-radius:50%; cursor:pointer;
+                      background:#2a2d45; color:var(--muted); font-size:10px;
+                      border:1px solid var(--border); margin-left:4px; flex-shrink:0; }
+    .mode-help-icon:active { color:var(--accent); border-color:var(--accent); }
   </style>
 </head>
 <body>
@@ -317,7 +253,7 @@
       <option value="auto">🌐 自動検出</option>
     </select>
   </div>
-  <!-- V4.1: モード選択（会話 / セミナー） -->
+  <!-- V4.1: モード選択（会話 / セミナー）+ ?アイコン -->
   <div class="setup-row">
     <span class="setup-label">🎛 モード</span>
     <div style="flex:1;display:flex;gap:10px;align-items:center;font-size:12px;color:var(--text);flex-wrap:wrap;padding-top:6px;">
@@ -329,6 +265,7 @@
         <input type="radio" name="mode-radio" value="conversation" onchange="onModeRadioChange(this)">
         💬 会話
       </label>
+      <span class="mode-help-icon" onclick="showModeHelp(event)" title="モードの説明">?</span>
       <span class="mode-badge" style="font-size:10px;color:var(--purple);margin-left:auto;">🎤 セミナーモード</span>
     </div>
   </div>
@@ -379,26 +316,14 @@
     </div>
     <!-- V4.1: 会話モード専用コンテナ（body.conv-mode のとき表示） -->
     <div id="conv-container">
-      <div id="conv-speakers">
-        <span id="conv-speakers-label">話者:</span>
-        <span class="speaker-chip a active" data-speaker-key="a"
-              onclick="selectConvSpeaker('a')"><span class="speaking-ind"></span>相手 A</span>
-        <span class="speaker-chip b inactive" data-speaker-key="b"
-              onclick="selectConvSpeaker('b')"><span class="speaker-dot"></span>相手 B</span>
-        <span class="speaker-chip c inactive" data-speaker-key="c"
-              onclick="selectConvSpeaker('c')"><span class="speaker-dot"></span>相手 C</span>
-        <span class="speaker-add" id="conv-speaker-add" onclick="addConvSpeaker()" title="話者を追加">＋</span>
-      </div>
       <div id="conv-messages">
-        <div id="conv-ph">会話モード開始後、話者ごとに吹き出しで表示されます<br>
-          <span style="font-size:10px;opacity:.5">日本語（あなたの発話）は表示されません<br>
-          話者切替は上部チップをタップ</span>
+        <div id="conv-ph">会話モード開始後、ブロック単位でリアルタイム翻訳を表示します<br>
+          <span style="font-size:10px;opacity:.5">指定した入力言語の音声のみを拾って翻訳します</span>
         </div>
       </div>
       <div id="conv-rec-inline">
         <span id="conv-rec-icon" style="font-size:12px;">⏸</span>
         <span id="conv-rec-text">「▶ 開始」で録音開始してください</span>
-        <span id="conv-rec-current" style="display:none">現在: <b id="conv-rec-current-label">相手 A</b></span>
       </div>
     </div>
   </div>
@@ -432,33 +357,12 @@
   </div>
 </div>
 
-<!-- V4.1: モード選択ダイアログ -->
-<div id="mode-dialog">
-  <div id="mode-dialog-inner">
-    <div id="mode-dialog-title">🎤 セッションのモードを選択</div>
-    <div id="mode-dialog-desc">
-      用途に合わせてモードを選ぶと、翻訳の反応速度・チャンク長・文脈量・要約の有無が自動調整されます。<br>
-      ※ 途中で設定パネルから切替できます。
-    </div>
-    <div class="mode-option" data-mode="seminar" onclick="selectModeInDialog('seminar')">
-      <div class="mode-option-icon">🎤</div>
-      <div>
-        <div class="mode-option-title">セミナーモード</div>
-        <div class="mode-option-desc">講演・プレゼン・長尺スピーチ向け。文脈を厚く取って高精度に翻訳し、90秒ごとに全体像まとめを生成。</div>
-      </div>
-    </div>
-    <div class="mode-option" data-mode="conversation" onclick="selectModeInDialog('conversation')">
-      <div class="mode-option-icon">💬</div>
-      <div>
-        <div class="mode-option-title">会話モード</div>
-        <div class="mode-option-desc">打合せ・雑談・短い掛け合い向け。短い発話も即座に翻訳、反応速度優先。要約は停止。</div>
-      </div>
-    </div>
-    <div id="mode-dialog-actions">
-      <button class="btn d" style="flex:1" onclick="closeModeDialog()">キャンセル</button>
-      <button class="btn g" style="flex:1" onclick="confirmModeDialog()">決定</button>
-    </div>
-  </div>
+<!-- V4.1: モード説明ポップアップ（？アイコンで表示） -->
+<div id="mode-help-popup" onclick="hideModeHelp()">
+  <div class="help-mode">🎤 セミナーモード</div>
+  <div>講演・プレゼン・長尺スピーチ向け。文脈を厚く取って高精度に翻訳し、90秒ごとに全体像まとめを生成します。</div>
+  <div class="help-mode">💬 会話モード</div>
+  <div>打合せ・雑談・短い発話向け。指定した入力言語の音声のみを拾い、ブロック単位で即座に翻訳します。要約は停止。</div>
 </div>
 
 <script>
@@ -484,20 +388,9 @@ var pendingJpQueue = [];    // 翻訳結果の表示待ちキュー（順番に1
 var isTyping       = false; // タイプライターアニメーション実行中フラグ
 var typingTimer    = null;  // タイプライタータイマー
 
-// V4.1: 会話モード state（1言語・複数話者・手動切替）
-// 話者キー: 'a','b','c','d' の4種（同言語内の話者識別・色分け用）
-// 日本語（自分）は表示しない（聞き専スタイル）
-var CONV_SPEAKER_KEYS = ['a','b','c','d'];  // 最大4話者
-var convSpeakers = {            // 登録済み話者のメタ情報
-  a: { key:'a', label:'相手 A', cls:'a' },
-  b: { key:'b', label:'相手 B', cls:'b' },
-  c: { key:'c', label:'相手 C', cls:'c' }
-};
-var convSpeakerCount  = 3;      // 初期表示は A/B/C の3人（+で D 追加可能）
-var activeConvSpeakerKey = 'a'; // 手動切替：現在の発話者キー（デフォルト A）
-var convMessages = [];          // [{id, speakerKey, source, trans, timeStr, lagSec}]
+// V4.1: 会話モード state（ブロック型・話者識別なし・指定言語のみ翻訳）
+var convMessages = [];          // [{id, lang, source, trans, timeStr, lagSec}]
 var convMsgSeq   = 0;           // メッセージID採番
-var pendingConvMsg = null;      // 翻訳中の暫定カード（未使用・将来拡張）
 var convRecognizingId  = null;  // 認識中の暫定カードID
 
 // Groqモード（MediaRecorder + Whisper Large v3 Turbo）
@@ -573,7 +466,6 @@ var MODE_PARAMS = {
   }
 };
 var currentMode = 'seminar';
-var modeConfirmed = false;
 
 // V4.1: 以下は let 相当（再代入可能）でモードに応じて applyModeParams() で上書き
 var PAUSE_MS              = MODE_PARAMS.seminar.PAUSE_MS;
@@ -624,8 +516,6 @@ function applyModeParams(mode) {
   // V4.1: 会話モードは body に conv-mode クラスを付与して UI を切替
   if (mode === 'conversation') {
     document.body.classList.add('conv-mode');
-    renderConvSpeakers();
-    updateConvCurrentSpeakerLabel();
   } else {
     document.body.classList.remove('conv-mode');
   }
@@ -651,49 +541,38 @@ function applyModeParams(mode) {
 })();
 
 // ============================================================
-// V4.1: モード選択ダイアログ制御
+// V4.1: モード切替（設定パネルのラジオで切替、？アイコンで説明）
 // ============================================================
-var _modeDialogResolver = null;
-var _modeDialogTempChoice = null;
-
-function showModeDialog() {
-  var initial = localStorage.getItem('session_mode') || currentMode || 'seminar';
-  _modeDialogTempChoice = MODE_PARAMS[initial] ? initial : 'seminar';
-  var opts = document.querySelectorAll('#mode-dialog .mode-option');
-  opts.forEach(function(el) {
-    el.classList.toggle('chosen', el.getAttribute('data-mode') === _modeDialogTempChoice);
-  });
-  document.getElementById('mode-dialog').classList.add('open');
-  return new Promise(function(resolve) { _modeDialogResolver = resolve; });
-}
-function selectModeInDialog(mode) {
-  if (!MODE_PARAMS[mode]) return;
-  _modeDialogTempChoice = mode;
-  var opts = document.querySelectorAll('#mode-dialog .mode-option');
-  opts.forEach(function(el) { el.classList.toggle('chosen', el.getAttribute('data-mode') === mode); });
-}
-function confirmModeDialog() {
-  var mode = _modeDialogTempChoice || 'seminar';
-  applyModeParams(mode);
-  localStorage.setItem('session_mode', mode);
-  modeConfirmed = true;
-  document.getElementById('mode-dialog').classList.remove('open');
-  if (_modeDialogResolver) { _modeDialogResolver(mode); _modeDialogResolver = null; }
-}
-function closeModeDialog() {
-  document.getElementById('mode-dialog').classList.remove('open');
-  if (_modeDialogResolver) { _modeDialogResolver(null); _modeDialogResolver = null; }
-}
-function ensureModeSelected() {
-  if (modeConfirmed) return Promise.resolve(currentMode);
-  return showModeDialog();
-}
 // 設定パネル内ラジオからの変更
 function onModeRadioChange(el) {
   if (!el || !el.value) return;
   applyModeParams(el.value);
   localStorage.setItem('session_mode', el.value);
-  modeConfirmed = true;  // 明示的にラジオで選んだ → ダイアログ省略可
+}
+// ？アイコン: モード説明ポップアップ表示/非表示
+function showModeHelp(evt) {
+  var popup = document.getElementById('mode-help-popup');
+  if (!popup) return;
+  popup.classList.add('open');
+  // クリック位置の下に表示
+  try {
+    var rect = (evt.target || evt.currentTarget).getBoundingClientRect();
+    popup.style.top  = (rect.bottom + 6) + 'px';
+    popup.style.left = Math.max(8, rect.left - 120) + 'px';
+  } catch(e) {}
+  // 外側クリックで閉じる
+  setTimeout(function() {
+    document.addEventListener('click', _modeHelpOutside, { once:true });
+  }, 10);
+  if (evt && evt.stopPropagation) evt.stopPropagation();
+}
+function hideModeHelp() {
+  var popup = document.getElementById('mode-help-popup');
+  if (popup) popup.classList.remove('open');
+}
+function _modeHelpOutside(e) {
+  var popup = document.getElementById('mode-help-popup');
+  if (popup && !popup.contains(e.target)) hideModeHelp();
 }
 
 // ─── UI ─────────────────────────────────────
@@ -816,84 +695,40 @@ function renderJpDisplay(stable, typing) {
 }
 function renderJapanese() { renderJpDisplay(stableJp,''); }
 
-// ─── V4.1: 会話モード 話者管理（手動タップ切替・1言語複数話者） ────────
-// 話者 A/B/C/D の4階調で同言語内の発話者を色分け。
-// アクティブ話者の変更は selectConvSpeaker(key) を呼ぶ（タップハンドラ）。
-function renderConvSpeakers() {
-  var el = document.getElementById('conv-speakers'); if (!el) return;
-  var keys = CONV_SPEAKER_KEYS.slice(0, convSpeakerCount);
-  // 話者ラベル + チップ + + ボタン
-  var chips = keys.map(function(k) {
-    var sp = convSpeakers[k]; if (!sp) return '';
-    var isActive = (k === activeConvSpeakerKey);
-    var cls = sp.cls + (isActive ? ' active' : ' inactive');
-    var dot = isActive ? '<span class="speaking-ind"></span>' : '<span class="speaker-dot"></span>';
-    return '<span class="speaker-chip '+cls+'" data-speaker-key="'+k+'"'
-         + ' onclick="selectConvSpeaker(\''+k+'\')">'
-         + dot + esc(sp.label) + '</span>';
-  }).join('');
-  var addBtn = (convSpeakerCount < CONV_SPEAKER_KEYS.length)
-    ? '<span class="speaker-add" onclick="addConvSpeaker()" title="話者を追加">＋</span>'
-    : '';
-  el.innerHTML = '<span id="conv-speakers-label">話者:</span>' + chips + addBtn;
-}
-// アクティブ話者を手動切替（タップ）
-function selectConvSpeaker(key) {
-  if (!convSpeakers[key]) return;
-  activeConvSpeakerKey = key;
-  renderConvSpeakers();
-  updateConvCurrentSpeakerLabel();
-}
-// 新しい話者を追加（D まで）
-function addConvSpeaker() {
-  if (convSpeakerCount >= CONV_SPEAKER_KEYS.length) return;
-  var nextKey = CONV_SPEAKER_KEYS[convSpeakerCount];
-  var nextLabel = '相手 ' + nextKey.toUpperCase();
-  convSpeakers[nextKey] = { key:nextKey, label:nextLabel, cls:nextKey };
-  convSpeakerCount++;
-  renderConvSpeakers();
-}
-// 録音インジケータの「現在: 相手 X」ラベルを更新
-function updateConvCurrentSpeakerLabel() {
-  var label = document.getElementById('conv-rec-current-label');
-  var wrap  = document.getElementById('conv-rec-current');
-  if (!label || !wrap) return;
-  var sp = convSpeakers[activeConvSpeakerKey];
-  if (sp) {
-    label.textContent = sp.label;
-    var col = getComputedStyle(document.documentElement).getPropertyValue('--sp-'+activeConvSpeakerKey+'-fg');
-    label.style.color = col.trim() || '';
-    wrap.style.display = isOn ? 'flex' : 'none';
-  }
+// ─── V4.1: 会話モード（話者識別なし・ブロック型・指定言語のみ翻訳）────────
+// Whisper が検出した language が input-lang-select の設定と異なる場合はスキップ。
+// auto 選択時は日本語のみスキップして他は全て処理。
+function shouldProcessLang(detectedLang) {
+  var d = (detectedLang || '').toLowerCase().slice(0, 2);
+  var target = getInputLang();
+  if (target === 'auto') return d !== 'ja';
+  // en / zh: 完全一致のみ処理
+  return d === target;
 }
 function addConvMessage(item) {
-  // item: {speakerKey:'a'|'b'|'c'|'d', lang, source, trans, lagSec, typing}
+  // item: {lang, source, trans, lagSec, typing}
   var msgs = document.getElementById('conv-messages'); if (!msgs) return;
   var ph = document.getElementById('conv-ph'); if (ph) ph.remove();
-  var sp = convSpeakers[item.speakerKey] || convSpeakers.a;
   convMsgSeq++;
   var id = 'conv-msg-' + convMsgSeq;
   var timeStr = item.timeStr || new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   var langTag = (item.lang||'').toUpperCase() + ' → 🇯🇵';
-  var avatarText = sp.key.toUpperCase();
-  var avatar = '<span class="msg-avatar '+sp.cls+'">'+avatarText+'</span>';
   var body   = (item.source ? '<div class="msg-source">'+esc(item.source)+'</div>' : '')
              + (item.trans  ? '<div class="msg-trans">'+esc(item.trans)+'</div>'
                             : '<div class="msg-trans"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>');
   var tail = (item.lagSec!=null) ? '<div class="msg-tail"><span>⏱ '+Number(item.lagSec).toFixed(1)+'s</span></div>' : '';
   var html = ''
     + '<div class="msg-group" id="'+id+'">'
-    +   '<div class="msg-meta">'+avatar
-    +     '<span>'+esc(sp.label)+'</span>'
+    +   '<div class="msg-meta">'
     +     '<span class="lang">'+langTag+'</span>'
     +     '<span>'+timeStr+'</span>'
     +   '</div>'
-    +   '<div class="msg-bubble '+sp.cls+(item.typing?' typing':'')+'">' + body + '</div>'
+    +   '<div class="msg-bubble'+(item.typing?' typing':'')+'">' + body + '</div>'
     +   tail
     + '</div>';
   msgs.insertAdjacentHTML('beforeend', html);
   requestAnimationFrame(function(){ msgs.scrollTop = msgs.scrollHeight; });
-  convMessages.push({ id:id, speakerKey:item.speakerKey, lang:item.lang, source:item.source, trans:item.trans, timeStr:timeStr, lagSec:item.lagSec });
+  convMessages.push({ id:id, lang:item.lang, source:item.source, trans:item.trans, timeStr:timeStr, lagSec:item.lagSec });
   return id;
 }
 function updateConvMessage(id, patch) {
@@ -921,20 +756,10 @@ function updateConvMessage(id, patch) {
   }
 }
 function clearConvMessages() {
-  convMessages = []; convMsgSeq = 0; pendingConvMsg = null;
-  convSpeakers = {
-    a: { key:'a', label:'相手 A', cls:'a' },
-    b: { key:'b', label:'相手 B', cls:'b' },
-    c: { key:'c', label:'相手 C', cls:'c' }
-  };
-  convSpeakerCount = 3;
-  activeConvSpeakerKey = 'a';
-  convRecognizingId = null;
+  convMessages = []; convMsgSeq = 0; convRecognizingId = null;
   var msgs = document.getElementById('conv-messages');
-  if (msgs) msgs.innerHTML = '<div id="conv-ph">会話モード開始後、話者ごとに吹き出しで表示されます<br><span style="font-size:10px;opacity:.5">日本語（あなたの発話）は表示されません<br>話者切替は上部チップをタップ</span></div>';
-  renderConvSpeakers();
+  if (msgs) msgs.innerHTML = '<div id="conv-ph">会話モード開始後、ブロック単位でリアルタイム翻訳を表示します<br><span style="font-size:10px;opacity:.5">指定した入力言語の音声のみを拾って翻訳します</span></div>';
   updateConvRecInline(false);
-  updateConvCurrentSpeakerLabel();
 }
 
 // V4.1: 会話画面下部の録音状態インジケータ
@@ -1218,27 +1043,22 @@ function flushGroqQueue() {
   });
 }
 
-// V4.1: 会話モード用チャンクハンドラ（聞き専・1言語複数話者・手動切替）
-// - 日本語（自分の発話と推定）→ 完全スキップ・表示しない
-// - 相手言語 → 現在 active な話者キーで暫定カード追加→Claude翻訳→カード更新
+// V4.1: 会話モード用チャンクハンドラ（ブロック型・指定言語のみ翻訳）
+// - Whisper が検出した language が設定と一致しない場合 or 日本語はスキップ
+// - 対象言語なら暫定ブロック追加→Claude翻訳→ブロック更新
 function handleConvChunk(text, language, chunkStart) {
-  // 認識中カードがあればクリア
   if (convRecognizingId) { removeRecognizingCard(); }
-  // 自分（日本語）と判定したら何もしない（聞き専のため非表示）
   var lang = (language || '').toLowerCase().slice(0, 2);
-  if (lang === 'ja') {
-    console.log('[conv] ja chunk skipped (self speech):', text.slice(0, 40));
+  if (!shouldProcessLang(lang)) {
+    console.log('[conv] chunk skipped (lang mismatch):', lang, 'target=', getInputLang(), 'text=', text.slice(0, 40));
     return;
   }
   var lastSpeechTime = chunkStart || Date.now();
   lastSpeechAt = Date.now();
   document.getElementById('s-words').textContent =
     (parseInt(document.getElementById('s-words').textContent, 10) || 0) + text.split(/\s+/).filter(Boolean).length;
-  // active speaker（手動切替）のカードとして追加
-  var speakerKey = activeConvSpeakerKey;
-  if (!convSpeakers[speakerKey]) speakerKey = 'a';
+  // 暫定ブロックを追加 → 翻訳完了で更新
   var msgId = addConvMessage({
-    speakerKey: speakerKey,
     lang: lang,
     source: text,
     typing: true,
@@ -1254,10 +1074,8 @@ function translateConvChunk(text, language, msgId, batchStart) {
   var ctx = getCtx();
   // 直近の会話履歴（最後 6 メッセージ）を文脈として
   var recentCtx = convMessages.slice(-6).map(function(m){
-    var sp = convSpeakers[m.speakerKey];
-    var tag = sp ? sp.label : '相手';
-    return '['+tag+'] '+(m.trans||m.source||'');
-  }).join('\n');
+    return (m.trans || m.source || '');
+  }).filter(Boolean).join('\n');
   var parts = [
     '同時通訳（会話モード）。[新規翻訳対象]の原文を自然な話し言葉の日本語に訳せ。',
     '短い発話・相槌・掛け合いを不自然にならないよう訳すこと。',
@@ -1458,11 +1276,8 @@ function startListening() {
   if(!getKey()) { showErr('⚠️ Claude API Keyを設定してください'); toggleSetup(); return; }
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!isGroqMode()&&!SR) { showErr('⚠️ このブラウザは音声認識に対応していません（Groq Keyを設定するか Safari / Chrome を使用）'); return; }
-  // V4.1: モード未確認なら起動時ダイアログを出し、確定したら録音開始（キャンセルなら中止）
-  ensureModeSelected().then(function(chosen) {
-    if (!chosen) return;
-    _startListeningInner();
-  });
+  // V4.1: モードは設定パネルで切替済みのものをそのまま使用（起動時ダイアログ撤去）
+  _startListeningInner();
 }
 function _startListeningInner() {
   isOn=true; lastTransAt=Date.now(); speechStartAt=0; isForcedStop=false; lastInterim='';
@@ -1487,8 +1302,6 @@ function _startListeningInner() {
   // V4.1: 会話モードなら画面下部のインジケータを「録音中」に
   if (currentMode === 'conversation') {
     updateConvRecInline(true);
-    renderConvSpeakers();
-    updateConvCurrentSpeakerLabel();  // 「現在: 相手 X」を表示
   }
 }
 function stopListening() {
@@ -1498,8 +1311,6 @@ function stopListening() {
   if (currentMode === 'conversation') {
     updateConvRecInline(false);
     removeRecognizingCard();
-    var recCur = document.getElementById('conv-rec-current');
-    if (recCur) recCur.style.display = 'none';
   }
   // Web Speech API 停止
   clearTimeout(chunkTimer); clearTimeout(chunkMaxTimer);
